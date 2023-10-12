@@ -1,0 +1,23 @@
+{
+  "name": "scriptlessautomation",
+  "version": "1.0.0",
+  "main": "src/test/index.js",
+  "scripts": {
+    "test": "mocha --parallel src/test/*.spec.js --require @babel/register --exit --timeout 10m"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.4.0",
+    "@babel/preset-env": "7.3.4",
+    "@babel/register": "^7.21.0",
+    "@xmldom/xmldom": "^0.8.7",
+    "axios": "^1.4.0",
+    "bluebird": "^3.5.4",
+    "canvas": "^2.11.2",
+    "chai": "^4.3.7",
+    "http-proxy": "^1.18.1",
+    "lodash": "^4.17.21",
+    "mocha": "^10.2.0",
+    "webdriverio": "4.14.4",
+    "xpath": "0.0.32"
+  }
+}
