@@ -1,0 +1,58 @@
+name: "🐞 Bug Report"
+description: "If something isn't working as expected."
+title: "[Bug]: <title>"
+labels: [Bug, "Needs Triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for taking the time to file a bug report! Please fill out this form as completely as possible."
+
+  - type: checkboxes
+    attributes:
+      label: "Check this if you would like to implement a PR, we are more than happy to help you go through the process"
+      options:
+        - label: "Would you like to work on a fix?"
+
+  - type: checkboxes
+    attributes:
+      label: "Is there an existing issue for this?"
+      description: "Please [search :mag: the issues](https://github.com/kobiton/appium-script-generator/issues) to check if this bug has already been reported."
+      options:
+      - label: "I have searched the existing issues"
+        required: true
+
+  - type: textarea
+    attributes:
+      label: "Current behavior"
+      description: "Describe the problem you are experiencing.  **Please do not paste your logs/screenshots here.**"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Expected behavior"
+      description: "Describe what you expect to happen instead."
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Environment
+      description: "Please provide the following information about your environment; feel free to remove any items which are not relevant."
+      value: |
+          - Operating system:
+          - Node.js version (output of `node -v`):
+          - Yarn version (output of `yarn -v`):
+          - Which is the commit code of the upstream that you are running (output of `git rev-parse HEAD`):
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: "Further information"
+      description: |
+        Links? References? Anything that will give us more context about the issue you are encountering!
+
+        _Tip: You can attach screenshots or log files by clicking this area to highlight it and then dragging files in._
+    validations:
+      required: false

@@ -1,19 +1,20 @@
 # appium-script-generator
+
 The Appium Script Generator will launch a gRPC server, which generates an Appium script whenever it receives a GenerateScript request. After generating the script, it sends the GenerateScript response back to the client.
 
-### Requirements
+## Requirements
 
-- Node.js v14.16.1
-- Yarn 1.22.4
+- Node.js v14.16.1. (output of `node -v` command)
+- Yarn v1.22.4. (output of `yarn -v` command)
 
-### Commands
+## Commands
 
 - `yarn install`: Install all dependent modules
 - `yarn start`: Start gRPC server
 - `yarn test`: Run unit tests
-- `yarn lint`: Check coding standard
+- `yarn lint`: Verify the coding style
 
-### Some explaination about this project structure
+## Some explanation about this project structure
 
 * `scripts`: Contains bash scripts for building and running this project on Kobiton System only.
 * `src`: Contains the source code for the project.
