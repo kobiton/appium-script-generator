@@ -1,4 +1,6 @@
 #!/bin/bash
 
-git submodule update
-bash ./scripts/compile-protoc.sh
+if [[ -z "${SKIP_COMPILE_PROTO}" ]]; then
+  git submodule update
+  bash ./scripts/compile-protoc.sh
+fi

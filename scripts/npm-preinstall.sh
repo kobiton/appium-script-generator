@@ -1,3 +1,5 @@
 #!/bin/bash
 
-git submodule init
+if [[ -z "${SKIP_COMPILE_PROTO}" ]]; then
+  git submodule init
+fi
