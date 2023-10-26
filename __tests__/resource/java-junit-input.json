@@ -1,0 +1,288 @@
+{
+  "sentAt": {
+    "low": 1105186912,
+    "high": 395,
+    "unsigned": true
+  },
+  "serverInfo": {
+    "apiUrl": "http://localhost:3000",
+    "portalUrl": "http://localhost:8181",
+    "username": "phuong",
+    "apiKey": "your_kobiton_api_key"
+  },
+  "isManualSession": true,
+  "manualSessionId": "605",
+  "devices": [
+    {
+      "id": 1881,
+      "name": "A5 2020",
+      "capabilities": {
+        "platformName": "Android",
+        "platformVersion": "9",
+        "resolution": {
+          "width": 720,
+          "height": 1600,
+          "scale": 1
+        }
+      }
+    }
+  ],
+  "testSteps": [
+    {
+      "id": "17000",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//*[@resource-id='com.android.chrome:id/url_bar']"
+            },
+            {
+              "type": "className",
+              "value": "android.widget.EditText"
+            },
+            {
+              "type": "xpath",
+              "value": "//android.widget.EditText[@resource-id='com.android.chrome:id/url_bar']"
+            },
+            {
+              "type": "xpath",
+              "value": "//android.widget.EditText[@text='edition.cnn.com']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.387\",\"y\":\"0.430\"}",
+      "findingElementTimeout": 7129,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17001",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"sendKeys\",\"value\":\"cnn.com\"}",
+      "findingElementTimeout": 4014,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17002",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"ENTER\"}",
+      "findingElementTimeout": 1612,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17003",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"LANDSCAPE\"}",
+      "findingElementTimeout": 14108,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17004",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"PORTRAIT\"}",
+      "findingElementTimeout": 8271,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17005",
+      "context": "WEB",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "/html/body/header/div/nav/div/div/div/div[1]/button/svg/path[1]"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.559\",\"y\":\"0.000\"}",
+      "findingElementTimeout": 8965,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17006",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//android.widget.TextView[@text='Biden arrives in Israel after Gaza hospital blast turmoil']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.297\",\"y\":\"0.230\"}",
+      "findingElementTimeout": 10128,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17007",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"sendKeys\",\"value\":\"uk\"}",
+      "findingElementTimeout": 4039,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17008",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"ENTER\"}",
+      "findingElementTimeout": 3277,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17009",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "(//android.webkit.WebView)[1]"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"swipeFromElement\",\"x1\":\"0.506\",\"y1\":\"0.815\",\"x2\":\"0.574\",\"y2\":\"0.251\",\"duration\":637}",
+      "findingElementTimeout": 13081,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17010",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"BACK\"}",
+      "findingElementTimeout": 6526,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17011",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "/hierarchy/android.widget.FrameLayout[3]/android.widget.FrameLayout[1]"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.079\",\"y\":\"0.173\"}",
+      "findingElementTimeout": 8360,
+      "isOnKeyboard": false
+    }
+  ],
+  "appUnderTest": {
+    "id": "com.android.chrome"
+  },
+  "desiredCapabilitiesOfDevices": [
+    {
+      "deviceId": 1881,
+      "desiredCapabilities": [
+        {
+          "key": "sessionName",
+          "value": "Automation on A5 2020",
+          "type": "string"
+        },
+        {
+          "key": "sessionDescription",
+          "value": "",
+          "type": "string"
+        },
+        {
+          "key": "deviceOrientation",
+          "value": "portrait",
+          "type": "string"
+        },
+        {
+          "key": "noReset",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "fullReset",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "captureScreenshots",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "newCommandTimeout",
+          "value": "900",
+          "type": "int"
+        },
+        {
+          "key": "keepScreenOn",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "ensureWebviewsHavePages",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:visualValidation",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:textValidation",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:flexCorrect",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:includeSystemWindows",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "browserName",
+          "value": "chrome",
+          "type": "string"
+        },
+        {
+          "key": "deviceGroup",
+          "value": "ORGANIZATION",
+          "type": "string"
+        },
+        {
+          "key": "deviceName",
+          "value": "A5 2020",
+          "type": "string"
+        },
+        {
+          "key": "platformVersion",
+          "value": "9",
+          "type": "string"
+        },
+        {
+          "key": "platformName",
+          "value": "Android",
+          "type": "string"
+        },
+        {
+          "key": "kobiton:baselineSessionId",
+          "value": "605",
+          "type": "int"
+        }
+      ]
+    }
+  ],
+  "requestScript": {
+    "name": "kobiton-appium-script-s605-p500-manual-java-junit-v5",
+    "language": "java",
+    "testingFramework": "junit"
+  }
+}
