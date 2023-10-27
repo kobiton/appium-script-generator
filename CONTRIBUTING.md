@@ -6,6 +6,7 @@
 |
 <strong><a href="#debugging-code">Debugging code</a></strong>
 </p>
+
 ---
 
 # Contributing to Appium Script Generator
