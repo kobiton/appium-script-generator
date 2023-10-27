@@ -6,8 +6,8 @@
   "author": "Kobiton Inc.",
   "scripts": {
     "start": "bash ./scripts/register-grpc-server.sh; nodemon src/index.js --exec babel-node",
-    "test": "jest",
-    "lint": "eslint src",
+    "test": "jest --forceExit",
+    "lint": "eslint \"src/**/*.js\"",
     "build": "bash scripts/build.sh",
     "preinstall": "bash ./scripts/npm-preinstall.sh",
     "postinstall": "bash ./scripts/npm-postinstall.sh",
