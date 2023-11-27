@@ -8,11 +8,13 @@ import generateScriptHandler from '../../src/handlers/generate-script'
 
 const GENERATE_SCRIPT_TIMEOUT = 60000
 const SERVICE_PROTO_FILE = path.resolve(
-  __dirname, '../../src/appium-script-schema/generate-script.proto')
+    __dirname, '../../src/appium-script-schema/generate-script.proto')
 const JAVA_JUNIT_INPUT_FILE = path.resolve(
-  __dirname, '../resource/java-junit-input.json')
+    __dirname, '../resource/java-junit-input.json')
+  const CSHARP_NUNIT_INPUT_FILE = path.resolve(
+    __dirname, '../resource/csharp-nunit-input.json')
 const NODEJS_MOCHA_INPUT_FILE = path.resolve(
-  __dirname, '../resource/nodejs-mocha-input.json')
+    __dirname, '../resource/nodejs-mocha-input.json')
 
 /**
  * Integration tests for the generate script gRPC service.
@@ -84,6 +86,25 @@ describe('../../src/appium-script-schema/generate-script.proto', () => {
    */
   it('should generate a Node.js & Mocha script successfully', async () => {
     const requestData = await readFile(NODEJS_MOCHA_INPUT_FILE, 'utf-8')
+    expect(requestData).not.toBeNull()
+
+    const requestJson = JSON.parse(requestData)
+    const response = await generateScriptRpcAsync(
+      {...requestJson, sentAt: Date.now()},
+      {deadline: Date.now() + GENERATE_SCRIPT_TIMEOUT}
+    )
+
+    expect(response).not.toHaveProperty('errorMessage')
+    expect(response).toHaveProperty('scriptInZipFormat')
+    expect(response.scriptInZipFormat).toEqual(expect.any(Buffer))
+  })
+
+  /**
+   * This test case checks that the generate method returns a C# & NUnit script
+   * when given valid input.
+   */
+   it('should generate a c# & NUnit script successfully', async () => {
+    const requestData = await readFile(CSHARP_NUNIT_INPUT_FILE, 'utf-8')
     expect(requestData).not.toBeNull()
 
     const requestJson = JSON.parse(requestData)

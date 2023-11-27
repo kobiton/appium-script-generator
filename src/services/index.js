@@ -1,6 +1,7 @@
 import {FRAMEWORK_NAMES, LANGUAGES} from './constant'
 import JavaAppiumScriptGenerator from './java'
 import NodejsAppiumScriptGenerator from './nodejs'
+import CSharpAppiumScriptGenerator from './csharp'
 
 export class AppiumScriptGenerator {
   constructor({debugNamespace = 'script-generator'}) {
@@ -37,6 +38,12 @@ export class AppiumScriptGenerator {
 
       case LANGUAGES.NODEJS:
         generator = new NodejsAppiumScriptGenerator({
+          debugNamespace: this._ns
+        })
+        break
+
+      case LANGUAGES.CSHARP:
+        generator = new CSharpAppiumScriptGenerator({
           debugNamespace: this._ns
         })
         break
