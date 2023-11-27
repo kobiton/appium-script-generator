@@ -1,4 +1,4 @@
 [submodule "appium-script-schema"]
 	path = appium-script-schema
 	branch = master
-	url = git@github.com:kobiton/appium-script-schema.git
+	url = https://github.com/kobiton/appium-script-schema.git

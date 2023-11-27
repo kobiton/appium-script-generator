@@ -1,0 +1,251 @@
+{
+  "sentAt": {
+    "low": 1105186912,
+    "high": 395,
+    "unsigned": true
+  },
+  "serverInfo": {
+    "apiUrl": "https://api.kobiton.com",
+    "portalUrl": "https://portal.kobiton.com",
+    "username": "kobitonadmin+appiumScriptGen",
+    "apiKey": "65530082-3eaa-44f8-adc5-e1d6d6a5a00c"
+  },
+  "isManualSession": true,
+  "manualSessionId": "605",
+  "devices": [
+    {
+      "id": 1881,
+      "name": "Lenovo Tab M10 FHD Plus",
+      "capabilities": {
+        "platformName": "Android",
+        "platformVersion": "10",
+        "resolution": {
+          "width": 720,
+          "height": 1600,
+          "scale": 1
+        }
+      }
+    }
+  ],
+  "testSteps": [
+    {
+      "id": "17000",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//*[@resource-id='com.android.chrome:id/url_bar']"
+            },
+            {
+              "type": "className",
+              "value": "android.widget.EditText"
+            },
+            {
+              "type": "xpath",
+              "value": "//android.widget.EditText[@resource-id='com.android.chrome:id/url_bar']"
+            },
+            {
+              "type": "xpath",
+              "value": "//android.widget.EditText[@text='edition.cnn.com']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.387\",\"y\":\"0.430\",\"value\":\"beyoung.in\"}",
+      "findingElementTimeout": 7129,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17001",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"Enter\"}",
+      "findingElementTimeout": 1612,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17002",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"Landscape\"}",
+      "findingElementTimeout": 14108,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17003",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"Portrait\"}",
+      "findingElementTimeout": 8271,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17004",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//android.view.View[@resource-id='__next']/android.view.View[5]/android.view.View[2]/android.widget.Image"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.559\",\"y\":\"0.000\"}",
+      "findingElementTimeout": 8965,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17005",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//android.view.View[@resource-id='__next']/android.view.View[5]/android.view.View[3]/android.widget.EditText"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.297\",\"y\":\"0.230\", \"value\":\"shirt\"}",
+      "findingElementTimeout": 10128,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17006",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "(//android.webkit.WebView[@text='Buy Shirts For Men Online at Beyoung - Upto 50% Off']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"swipeFromElement\",\"x1\":\"40\",\"y1\":\"470\",\"x2\":\"37\",\"y2\":\"470\",\"duration\":637}",
+      "findingElementTimeout": 13081,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17007",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"Back\"}",
+      "findingElementTimeout": 6526,
+      "isOnKeyboard": false
+    }
+  ],
+  "appUnderTest": {
+    "id": "com.android.chrome",
+    "appVersionId": "1.0.0"
+  },
+  "desiredCapabilitiesOfDevices": [
+    {
+      "deviceId": 1881,
+      "desiredCapabilities": [
+        {
+          "key": "sessionName",
+          "value": "Automation c# script testing",
+          "type": "string"
+        },
+        {
+          "key": "sessionDescription",
+          "value": "",
+          "type": "string"
+        },
+        {
+          "key": "deviceOrientation",
+          "value": "portrait",
+          "type": "string"
+        },
+        {
+          "key": "noReset",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "fullReset",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "captureScreenshots",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "newCommandTimeout",
+          "value": "900",
+          "type": "int"
+        },
+        {
+          "key": "keepScreenOn",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "ensureWebviewsHavePages",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:visualValidation",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:textValidation",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:flexCorrect",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "kobiton:includeSystemWindows",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "browserName",
+          "value": "chrome",
+          "type": "string"
+        },
+        {
+          "key": "deviceGroup",
+          "value": "KOBITON",
+          "type": "string"
+        },
+        {
+          "key": "deviceName",
+          "value": "Lenovo Tab M10 FHD Plus",
+          "type": "string"
+        },
+        {
+          "key": "platformVersion",
+          "value": "10",
+          "type": "string"
+        },
+        {
+          "key": "platformName",
+          "value": "Android",
+          "type": "string"
+        },
+        {
+          "key": "kobi:retainDurationInSeconds",
+          "value": "0",
+          "type": "int"
+        }
+      ]
+    }
+  ],
+  "requestScript": {
+    "name": "kobiton-appium-script-s605-p500-manual-csharp-nunit-v3",
+    "language": "csharp",
+    "testingFramework": "nunit"
+  }
+}

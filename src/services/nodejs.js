@@ -468,13 +468,14 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
   }) {
     const subDir = isManualSession ? 'manual' : 'revisit'
     const outputFile = path.join(workingDir, `${requestScript.name}.zip`)
+    
     const compressedDir = path.join(workingDir, testingFramework)
     const outputProject = path.join(compressedDir, requestScript.name, subDir)
     const outputProjectSrc = path.join(outputProject, 'src/test')
     const outputProjectHelper = path.join(outputProject, 'src/test/helper')
     const outputProjectResourceInfo = path.join(outputProject, 'src/resources')
     const templateScriptDir = path.join(__dirname, '../templates/nodejs')
-
+    console.log(`templateScriptDir : ${templateScriptDir}`)
     await createDir(outputProjectSrc)
     await createDir(outputProjectHelper)
     await createDir(outputProjectResourceInfo)
@@ -491,8 +492,9 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
       path.join(templateScriptDir, 'src/test/helper/app.js'),
       'utf8'
     )
+    console.log(`testAppCode : ${testAppCode}`)
     testAppCode = testAppCode.replace('{{testScript}}', this._buildNodejsCode(testScriptLines, 2))
-
+    console.log(`testAppCode : ${testAppCode}`)
     let appSpecCode = await readFile(path.join(templateScriptDir, 'src/test/mocha.spec.js'), 'utf8')
     appSpecCode = appSpecCode.replace('{{testCases}}', this._buildNodejsCode(testCaseLines, 1))
 
