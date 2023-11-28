@@ -29,7 +29,6 @@ namespace AppiumTest
         public string deviceName, platformVersion;
         public HttpClient httpClient = new HttpClient();
         private string currentContext;
-        private long currentCommandId;
 
         public static string IosXpathRedundantPrefix = "/AppiumAUT";
         public static string NativeContext = "NATIVE_APP";
@@ -643,7 +642,7 @@ namespace AppiumTest
                     }
                     else
                     {
-                        driver.ExecuteScript("mobile: pressButton");//, ImmutableMap.of("name", "home"));
+                            driver.ExecuteScript("mobile: pressButton");//, ImmutableMap.of("name", "home"));
                     }
                 }
                 else
@@ -885,9 +884,22 @@ namespace AppiumTest
             return new Uri(Config.AppiumServerUrl);
         }
 
+        public long GetCurrentCommandId()
+        {
+            return this.proxy != null ? this.proxy.currentCommandId : 0;
+        }
+
+        public long GetKobitonSessionId()
+        {
+            return this.proxy != null ? this.proxy.kobitonSessionId : 0;
+        }
+
         public void SetCurrentCommandId(long currentCommandId)
         {
-            this.currentCommandId = currentCommandId;
+            if (this.proxy != null)
+            {
+                this.proxy.currentCommandId = currentCommandId;
+            }
         }
 
         public string GetAppUrl()

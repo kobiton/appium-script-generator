@@ -142,9 +142,9 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       desiredCapsLines.push(new Line(''))
       
       let credentails
-      credentails = `capabilities.AddAdditionalCapability("username", KobitonUserName);`
+      credentails = 'capabilities.AddAdditionalCapability("username", KobitonUserName);'
       desiredCapsLines.push(new Line(credentails))
-      credentails = `capabilities.AddAdditionalCapability("accessKey", KobitonApiKey);`
+      credentails = 'capabilities.AddAdditionalCapability("accessKey", KobitonApiKey);'
       desiredCapsLines.push(new Line(credentails))
 
       desiredCapabilities.forEach(({key, value, type}) => {
@@ -313,9 +313,10 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
             lines.push(new Line(`TouchOnElementByType(${elementVarName}, ${x}, ${y});`))
             //
             try {
-              const { value } =  action
-              if (value != undefined)
+              const {value} = action
+              if (value != undefined) {
                 lines.push(new Line(`${elementVarName}.SendKeys(${this._getString(value)});`))
+              }
             }
             catch (error) {
               console.error(`Cannot parse actionJson value: ${actionJson}`)
@@ -535,11 +536,10 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       'utf8'
     )
 
-    console.log(testAppCode);
+    console.log(testAppCode)
     testAppCode = testAppCode.replace('{{testCases}}', this._buildCSharpCode(testCaseLines, 1))
     testAppCode = testAppCode.replace('{{testScript}}', this._buildCSharpCode(testScriptLines, 4))
 
-    let testSuiteCode
     if (testingFramework === FRAMEWORK_NAMES.TESTNG) {
       testAppCode = testAppCode.replace(/{{portalUrl}}/g, serverInfo.portalUrl)
     }
