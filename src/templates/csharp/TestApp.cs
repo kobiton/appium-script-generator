@@ -29,10 +29,7 @@ namespace AppiumTest
             {
                 Console.WriteLine(e.StackTrace);
                 SaveDebugResource();
-            }
-            finally
-            {
-                Cleanup();
+                throw;
             }
         }
 

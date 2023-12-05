@@ -212,7 +212,8 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
       testCaseLines.push(new Line('[Test]', 1))
       testCaseLines.push(new Line(`public void ${testCaseMethodName}() {`))
-
+      testCaseLines.push(new Line('try', 1))
+      testCaseLines.push(new Line('{'))
       if (testingFramework === FRAMEWORK_NAMES.NUNIT) {
         if (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName) {
           testCaseLines.push(new Line(
@@ -242,7 +243,12 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
         testCaseLines.push(new Line(`testApp.Setup(capabilities, ${retinaScale});`))
         testCaseLines.push(new Line('testApp.RunTest();'))
       }
-
+      testCaseLines.push(new Line('}', -1))
+      testCaseLines.push(new Line('catch (Exception ex)'))
+      testCaseLines.push(new Line('{'))
+      testCaseLines.push(new Line('Console.WriteLine("An exception occured: " + ex.Message);', 1))
+      testCaseLines.push(new Line('throw;'))
+      testCaseLines.push(new Line('}', -1))
       testCaseLines.push(new Line('}', -1))
       testCaseLines.push(new Line(''))
     }
@@ -337,7 +343,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
             lines.push(new Line(`AppiumWebElement ${elementVarName} = FindElementBy(${findingElementTimeout}, ${locatorVarName});`))
 
             const rectVarName = `rect${rawLocatorVarName}`
-            lines.push(new Line(`Rectangle ${rectVarName} = GetWebElementRect(${elementVarName});`))
+            lines.push(new Line(`Rectangle ${rectVarName} = ${elementVarName}.Rect;`))
 
             const fromPointVarName = `fromPointOn${rawLocatorVarName}`
             lines.push(new Line(`Point ${fromPointVarName} = GetAbsolutePoint(${x1}, ${y1}, ${rectVarName});`))

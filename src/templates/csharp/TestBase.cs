@@ -218,7 +218,7 @@ namespace AppiumTest
 
         public Object ExecuteScriptOnWebElement(AppiumWebElement element, string command)
         {
-            string script = File.ReadAllText("/test/resources/execute-script-on-web-element.js", Encoding.UTF8);
+            string script = File.ReadAllText("../../../test/resources/execute-script-on-web-element.js", Encoding.UTF8);
             return driver.ExecuteScript(script, element, command);
         }
 
@@ -231,12 +231,12 @@ namespace AppiumTest
         public Rectangle GetWebElementRect(AppiumWebElement element)
         {
             string resultString = (string) ExecuteScriptOnWebElement(element, "getBoundingClientRect");
-            dynamic resultJson = JObject.Parse(resultString);
+            dynamic resultJson = JsonConvert.DeserializeObject(resultString);
             Rectangle rect = new Rectangle(
-                (int)(resultJson.x.getAsLong() / retinaScale),
-                (int)(resultJson.y.getAsLong() / retinaScale),
-                (int)(resultJson.height.getAsLong() / retinaScale),
-                (int)(resultJson.width.getAsLong() / retinaScale)
+                (int)(Convert.ToInt64(resultJson.x) / retinaScale),
+                (int)(Convert.ToInt64(resultJson.y) / retinaScale),
+                (int)(Convert.ToInt64(resultJson.width) / retinaScale),
+                (int)(Convert.ToInt64(resultJson.height) / retinaScale)
             );
 
             return rect;
