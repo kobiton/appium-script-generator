@@ -8,7 +8,7 @@
     "apiUrl": "https://api.kobiton.com",
     "portalUrl": "https://portal.kobiton.com",
     "username": "kobitonadmin+appiumScriptGen",
-    "apiKey": "1fe3a51b-ad53-4f75-8269-8c11098f1bd3"
+    "apiKey": "your_kobiton_api_key"
   },
   "isManualSession": true,
   "manualSessionId": "605",
