@@ -52,6 +52,10 @@ export function buildCode({language, lines, initialIndent = 0}) {
       break
     case LANGUAGES.NODEJS:
       space = '  '
+      break
+    case LANGUAGES.CSHARP:
+      space = '    '
+      break
   }
 
   for (const line of lines) {
