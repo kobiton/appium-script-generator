@@ -8,10 +8,9 @@ namespace AppiumTest
     {
         [SetUp]
         public void BeforeAll() {
-            Assert.AreNotEqual(
-                "Please update value for the KobitonApiKey constant first. See more at README.md file.",
-                "your_kobiton_api_key",
-                Config.KobitonApiKey
+            Assert.That(
+                Config.KobitonApiKey, Is.Not.EqualTo("your_kobiton_api_key"),
+                "Please update value for the KobitonApiKey constant first. See more at README.md file."
             );
         }
 

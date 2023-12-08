@@ -42,7 +42,7 @@ const generateHandler = async ({request}, callback) => {
     }
 
     // Clean up cached files
-    //await removeDir(workingDir)
+    await removeDir(workingDir)
   }
   catch (error) {
     console.error(ns, error)

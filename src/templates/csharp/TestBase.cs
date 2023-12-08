@@ -20,7 +20,7 @@ namespace AppiumTest
 {
     public class TestBase
     {
-        public enum PressTypes { Home, Back, Power, AppSwitch, Enter, Delete }
+        public enum PressTypes { HOME, BACK, POWER, APP_SWITCH, ENTER, DELETE }
 
         public AppiumDriver<AppiumWebElement> driver;
         public AppiumOptions options;
@@ -244,11 +244,12 @@ namespace AppiumTest
 
         public Rectangle CalculateNativeRect(Rectangle webElementRect)
         {
+            AppiumWebElement appiumWebElement = FindWebview();
             Rectangle webviewRect = new Rectangle(
-                FindWebview().Location.X,
-                FindWebview().Location.Y,
-                FindWebview().Size.Width,
-                FindWebview().Size.Height
+                appiumWebElement).Location.X,
+                appiumWebElement.Location.Y,
+                appiumWebElement.Size.Width,
+                appiumWebElement.Size.Height
             );
 
             AppiumWebElement topToolbar = null;
@@ -270,8 +271,8 @@ namespace AppiumTest
                         Rectangle firstChildRect = new Rectangle(
                             int.Parse(firstChildElement.Attributes["x"].Value),
                             int.Parse(firstChildElement.Attributes["y"].Value),
-                            int.Parse(firstChildElement.Attributes["height"].Value),
-                            int.Parse(firstChildElement.Attributes["width"].Value)
+                            int.Parse(firstChildElement.Attributes["width"].Value),
+                            int.Parse(firstChildElement.Attributes["height"].Value)
                         );
 
                         if (!webviewRect.Equals(firstChildRect) && Utils.IsRectangleInclude(webviewRect, firstChildRect))
@@ -302,15 +303,15 @@ namespace AppiumTest
             webviewRect = new Rectangle(
                 webviewRect.X,
                 webviewRect.Y,
-                webviewRect.Height - deltaHeight,
-                webviewRect.Width
+                webviewRect.Width,
+                webviewRect.Height - deltaHeight
             );
 
             Rectangle nativeRect = new Rectangle(
                 webviewRect.X + webElementRect.X,
                 webviewRect.Y + webElementRect.Y,
-                webElementRect.Height,
-                webElementRect.Width
+                webElementRect.Width,
+                webElementRect.Height
             );
             return nativeRect;
         }
@@ -650,7 +651,7 @@ namespace AppiumTest
         {
             Console.WriteLine($"Clear text field, maximum {maxChars} characters");
             for (int i = 0; i < maxChars; i++) {
-                Press(PressTypes.Delete);
+                Press(PressTypes.DELETE);
             }
         }
 
@@ -659,7 +660,7 @@ namespace AppiumTest
             Console.WriteLine($"Press on {type} key");
 
             switch (type) {
-                case PressTypes.Home:
+                case PressTypes.HOME:
                 if (isIos)
                 {
                     IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
@@ -678,11 +679,11 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.Back:
+            case PressTypes.BACK:
                 PressAndroidKey(AndroidKeyCode.Back);
                 break;
 
-            case PressTypes.Power:
+            case PressTypes.POWER:
                 if (isIos)
                 {
                     IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
@@ -701,11 +702,11 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.AppSwitch:
+            case PressTypes.APP_SWITCH:
                 PressAndroidKey(AndroidKeyCode.Keycode_APP_SWITCH);
                 break;
 
-            case PressTypes.Enter:
+            case PressTypes.ENTER:
                 if (isIos)
                 {
                     SendKeys("\n");
@@ -716,7 +717,7 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.Delete:
+            case PressTypes.DELETE:
                 if (isIos)
                 {
                     SendKeys("\b");
