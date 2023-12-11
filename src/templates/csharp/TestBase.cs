@@ -20,7 +20,7 @@ namespace AppiumTest
 {
     public class TestBase
     {
-        public enum PressTypes { HOME, BACK, POWER, APP_SWITCH, ENTER, DELETE }
+        public enum PressTypes { Home, Back, Power, App_Switch, Enter, Delete }
 
         public AppiumDriver<AppiumWebElement> driver;
         public AppiumOptions options;
@@ -44,7 +44,7 @@ namespace AppiumTest
             this.deviceName= desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName).ToString();
             this.platformVersion = desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion).ToString();
 
-            if (Config.DeviceSource == Config.DeviceSourceEnums.KOBITON)
+            if (Config.DeviceSource == Config.DeviceSourceEnums.Kobiton)
             {
                 proxy = new ProxyServer();
                 proxy.StartProxy();
@@ -63,9 +63,12 @@ namespace AppiumTest
 
         public async void Cleanup()
         {
-            driver.Quit();
+            if (driver != null)
+            {
+                driver.Quit();
+            }
 
-            if(proxy != null)
+            if (proxy != null)
             {
                 proxy.StopProxy();
             }
@@ -246,7 +249,7 @@ namespace AppiumTest
         {
             AppiumWebElement appiumWebElement = FindWebview();
             Rectangle webviewRect = new Rectangle(
-                appiumWebElement).Location.X,
+                appiumWebElement.Location.X,
                 appiumWebElement.Location.Y,
                 appiumWebElement.Size.Width,
                 appiumWebElement.Size.Height
@@ -651,7 +654,7 @@ namespace AppiumTest
         {
             Console.WriteLine($"Clear text field, maximum {maxChars} characters");
             for (int i = 0; i < maxChars; i++) {
-                Press(PressTypes.DELETE);
+                Press(PressTypes.Delete);
             }
         }
 
@@ -660,7 +663,7 @@ namespace AppiumTest
             Console.WriteLine($"Press on {type} key");
 
             switch (type) {
-                case PressTypes.HOME:
+                case PressTypes.Home:
                 if (isIos)
                 {
                     IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
@@ -679,11 +682,11 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.BACK:
+            case PressTypes.Back:
                 PressAndroidKey(AndroidKeyCode.Back);
                 break;
 
-            case PressTypes.POWER:
+            case PressTypes.Power:
                 if (isIos)
                 {
                     IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
@@ -702,11 +705,11 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.APP_SWITCH:
+            case PressTypes.App_Switch:
                 PressAndroidKey(AndroidKeyCode.Keycode_APP_SWITCH);
                 break;
 
-            case PressTypes.ENTER:
+            case PressTypes.Enter:
                 if (isIos)
                 {
                     SendKeys("\n");
@@ -717,7 +720,7 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.DELETE:
+            case PressTypes.Delete:
                 if (isIos)
                 {
                     SendKeys("\b");
@@ -1032,7 +1035,7 @@ namespace AppiumTest
                
         public Device FindOnlineDevice(AppiumOptions capabilities)
         {
-            if (Config.DeviceSource != Config.DeviceSourceEnums.KOBITON) {
+            if (Config.DeviceSource != Config.DeviceSourceEnums.Kobiton) {
                 return null;
             }
 

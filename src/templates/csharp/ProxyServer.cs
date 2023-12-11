@@ -46,7 +46,7 @@ namespace AppiumTest
                 urlString = urlString.Replace("/wd/hub", "");
             }
 
-            if(Config.DeviceSource == Config.DeviceSourceEnums.KOBITON && currentCommandId > 0)
+            if(Config.DeviceSource == Config.DeviceSourceEnums.Kobiton && currentCommandId > 0)
             {
                 if (!string.IsNullOrEmpty(request.Url.Query))
                 {

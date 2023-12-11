@@ -74,14 +74,14 @@
     {
       "id": "17003",
       "context": "NATIVE",
-      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"Landscape\"}",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"LANDSCAPE\"}",
       "findingElementTimeout": 14108,
       "isOnKeyboard": false
     },
     {
       "id": "17004",
       "context": "NATIVE",
-      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"Portrait\"}",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"PORTRAIT\"}",
       "findingElementTimeout": 8271,
       "isOnKeyboard": false
     },

@@ -10,12 +10,12 @@ namespace AppiumTest
 {
     public class Config
     {
-        public enum DeviceSourceEnums { KOBITON, SAUCE_LABS }
+        public enum DeviceSourceEnums { Kobiton, SauceLabs }
 
         public const string {{USER_NAME}} = "{{username}}";
         public const string {{API_KEY}} = "{{your_api_key}}";
         public const string AppiumServerUrl = {{appiumServerUrl}};
-        public const DeviceSourceEnums DeviceSource = DeviceSourceEnums.KOBITON;//.{ { deviceSource} };
+        public const DeviceSourceEnums DeviceSource = DeviceSourceEnums.Kobiton;
         public const int ImplicitWaitInMs = 30000;
         public const int DeviceWaitingMaxTryTimes = 5;
         public const int DeviceWaitingInternalInMs = 30000;

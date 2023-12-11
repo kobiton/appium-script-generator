@@ -5,6 +5,7 @@ import get from 'lodash/get'
 import {FRAMEWORK_NAMES, DEVICE_SOURCES, CONTEXTS, LANGUAGES} from './constant'
 import {buildCode, Line} from '../models/line'
 import compress from '../utils/compress'
+import {startCase} from 'lodash'
 import {readFile, writeFile, createDir} from '../utils/fs-wrapper'
 import {BaseAppiumScriptGenerator} from './base'
 
@@ -377,7 +378,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'press': {
           const {value} = action
-          lines.push(new Line(`Press(PressTypes.${value});`))
+          lines.push(new Line(`Press(PressTypes.${startCase(value.toLowerCase())});`))
         } break
 
         case 'sendKeys': {
@@ -422,7 +423,8 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'rotate': {
           const {orientation} = action
-          lines.push(new Line(`driver.Orientation = ScreenOrientation.${orientation};`))
+          const orientationStr = startCase(orientation.toLowerCase())
+          lines.push(new Line(`driver.Orientation = ScreenOrientation.${orientationStr};`))
         } break
 
         case 'setLocation': {
