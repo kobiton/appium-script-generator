@@ -63,9 +63,12 @@ namespace AppiumTest
 
         public async void Cleanup()
         {
-            driver.Quit();
+            if (driver != null)
+            {
+                driver.Quit();
+            }
 
-            if(proxy != null)
+            if (proxy != null)
             {
                 proxy.StopProxy();
             }
@@ -246,7 +249,7 @@ namespace AppiumTest
         {
             AppiumWebElement appiumWebElement = FindWebview();
             Rectangle webviewRect = new Rectangle(
-                appiumWebElement).Location.X,
+                appiumWebElement.Location.X,
                 appiumWebElement.Location.Y,
                 appiumWebElement.Size.Width,
                 appiumWebElement.Size.Height
