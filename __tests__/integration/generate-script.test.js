@@ -14,7 +14,7 @@ const JAVA_JUNIT_INPUT_FILE = path.resolve(
 const CSHARP_NUNIT_INPUT_FILE = path.resolve(
     __dirname, '../resource/csharp-nunit-input.json')
 const NODEJS_MOCHA_INPUT_FILE = path.resolve(
-    __dirname, '../resource/nodejs-mocha-input.json')
+  __dirname, '../resource/nodejs-mocha-input.json')
 
 /**
  * Integration tests for the generate script gRPC service.
