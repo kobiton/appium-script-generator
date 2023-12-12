@@ -2,7 +2,7 @@ import BPromise from 'bluebird'
 import path from 'path'
 import {URL} from 'url'
 import get from 'lodash/get'
-import startCase from 'lodash/startCase'
+import upperFirst from 'lodash/upperFirst'
 import camelCase from 'lodash/camelCase'
 import {FRAMEWORK_NAMES, DEVICE_SOURCES, CONTEXTS, LANGUAGES} from './constant'
 import {buildCode, Line} from '../models/line'
@@ -379,7 +379,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'press': {
           const {value} = action
-          lines.push(new Line(`Press(PressTypes.${startCase(camelCase(value))});`))
+          lines.push(new Line(`Press(PressTypes.${upperFirst(camelCase(value))});`))
         } break
 
         case 'sendKeys': {
@@ -424,7 +424,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'rotate': {
           const {orientation} = action
-          const orientationStr = startCase(orientation.toLowerCase())
+          const orientationStr = upperFirst(camelCase(orientation))
           lines.push(new Line(`driver.Orientation = ScreenOrientation.${orientationStr};`))
         } break
 
