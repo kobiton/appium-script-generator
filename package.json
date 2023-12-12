@@ -7,7 +7,7 @@
   "scripts": {
     "start": "bash ./scripts/register-grpc-server.sh; nodemon src/index.js --exec babel-node",
     "test": "jest --forceExit",
-    "lint": "eslint src",
+    "lint": "eslint src __tests__",
     "build": "bash scripts/build.sh",
     "preinstall": "bash ./scripts/npm-preinstall.sh",
     "postinstall": "bash ./scripts/npm-postinstall.sh",

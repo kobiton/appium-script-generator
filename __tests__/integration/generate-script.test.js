@@ -103,7 +103,7 @@ describe('../../src/appium-script-schema/generate-script.proto', () => {
    * This test case checks that the generate method returns a C# & NUnit script
    * when given valid input.
    */
-   it('should generate a c# & NUnit script successfully', async () => {
+  it('should generate a c# & NUnit script successfully', async () => {
     const requestData = await readFile(CSHARP_NUNIT_INPUT_FILE, 'utf-8')
     expect(requestData).not.toBeNull()
 
