@@ -20,7 +20,7 @@ namespace AppiumTest
 {
     public class TestBase
     {
-        public enum PressTypes { Home, Back, Power, App_Switch, Enter, Delete }
+        public enum PressTypes { Home, Back, Power, AppSwitch, Enter, Delete }
 
         public AppiumDriver<AppiumWebElement> driver;
         public AppiumOptions options;
@@ -49,7 +49,7 @@ namespace AppiumTest
                 proxy = new ProxyServer();
                 proxy.StartProxy();
             }
-            
+
             Uri appiumServerUrl = GetAppiumServerUrl();
             if (isIos)
             {
@@ -266,11 +266,11 @@ namespace AppiumTest
                     HtmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
                     HtmlNode webviewNode = nativeDocument.DocumentNode.SelectSingleNode("//XCUIElementTypeWebView");
                     HtmlNode curElement = webviewNode.ParentNode;
-                
+
                     while (curElement != null)
                     {
                         HtmlNode firstChildElement = curElement.SelectSingleNode("//XCUIElementTypeWebView");
-                        
+
                         Rectangle firstChildRect = new Rectangle(
                             int.Parse(firstChildElement.Attributes["x"].Value),
                             int.Parse(firstChildElement.Attributes["y"].Value),
@@ -348,7 +348,7 @@ namespace AppiumTest
                 throw new Exception(notFoundMessage);
             } else {
                 int waitInterval = 5;
-                
+
                 return Utils.Retry((attempt) =>
                 {
                     SetImplicitWaitInMiliSecond(0);
@@ -445,7 +445,7 @@ namespace AppiumTest
                 }
             }
 
-            if (visibleElement != null) 
+            if (visibleElement != null)
                 return visibleElement;
             else
                 throw new Exception($"Cannot find visible web element by: {locatorText}");
@@ -705,7 +705,7 @@ namespace AppiumTest
                 }
                 break;
 
-            case PressTypes.App_Switch:
+            case PressTypes.AppSwitch:
                 PressAndroidKey(AndroidKeyCode.Keycode_APP_SWITCH);
                 break;
 
@@ -893,7 +893,7 @@ namespace AppiumTest
             {
                 HtmlNode expectedChild = expected.ChildNodes.ElementAt(i);
                 HtmlNode actualChild = actual.ChildNodes.ElementAt(i);
-                
+
                 bool isEqual = compareNodes(expectedChild, actualChild);
                 if (!isEqual)
                 {
@@ -965,7 +965,7 @@ namespace AppiumTest
 
             return appUrl;
         }
-        
+
         public void SaveDebugResource()
         {
             try
@@ -990,7 +990,7 @@ namespace AppiumTest
                 Console.WriteLine(e.StackTrace);
             }
         }
-        
+
         public async Task<Device> GetAvailableDevice(AppiumOptions capabilities)
         {
             var deviceListUriBuilder = new UriBuilder(Config.KobitonApiUrl + "/v1/devices");
@@ -1032,7 +1032,7 @@ namespace AppiumTest
                 return deviceList[0];
             }
         }
-               
+
         public Device FindOnlineDevice(AppiumOptions capabilities)
         {
             if (Config.DeviceSource != Config.DeviceSourceEnums.Kobiton) {
@@ -1062,7 +1062,7 @@ namespace AppiumTest
             }
             return device;
         }
-        
+
 
         public class Device
         {
