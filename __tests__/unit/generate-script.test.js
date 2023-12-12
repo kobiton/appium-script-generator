@@ -111,7 +111,7 @@ describe('../../src/handlers/generate-script', () => {
 
     expect(consoleLogSpy).toHaveBeenCalledTimes(2)
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.any(String), `Recieve request: ${JSON.stringify(request)}`)
+      expect.any(String), `Receive request: ${JSON.stringify(request)}`)
     expect(consoleLogSpy).toHaveBeenCalledWith(
       // eslint-disable-next-line max-len
       expect.any(String), expect.stringMatching('Generated script \\(errorMessage:\\s.*\\). Respond to client'))
@@ -143,7 +143,7 @@ describe('../../src/handlers/generate-script', () => {
 
     expect(consoleLogSpy).toHaveBeenCalledTimes(3)
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      expect.any(String), `Recieve request: ${JSON.stringify(request)}`)
+      expect.any(String), `Receive request: ${JSON.stringify(request)}`)
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.any(String), `outputFile: ${outputFile}`)
     expect(consoleLogSpy).toHaveBeenCalledWith(
       expect.any(String), 'Generated script successfully. Respond to client')

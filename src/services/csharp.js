@@ -527,7 +527,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       'utf8'
     )
 
-    console.log(testAppCode)
     testAppCode = testAppCode.replace('{{testCases}}', this._buildCSharpCode(testCaseLines, 1))
     testAppCode = testAppCode.replace('{{testScript}}', this._buildCSharpCode(testScriptLines, 4))
 
