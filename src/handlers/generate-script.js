@@ -21,7 +21,7 @@ const generateHandler = async ({request}, callback) => {
   const {sentAt, manualSessionId} = request
 
   let ns = `${debugNamespace}-req${sentAt}`
-  console.log(ns, `Recieve request: ${JSON.stringify(request)}`)
+  console.log(ns, `Receive request: ${JSON.stringify(request)}`)
 
   let errorMessage
   let scriptInZipFormat
