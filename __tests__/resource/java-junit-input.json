@@ -5,9 +5,9 @@
     "unsigned": true
   },
   "serverInfo": {
-    "apiUrl": "http://localhost:3000",
-    "portalUrl": "http://localhost:8181",
-    "username": "phuong",
+    "apiUrl": "https://api.kobiton.com",
+    "portalUrl": "https://portal.kobiton.com",
+    "username": "kobitonadmin+appiumScriptGen",
     "apiKey": "your_kobiton_api_key"
   },
   "isManualSession": true,
@@ -45,10 +45,6 @@
             {
               "type": "xpath",
               "value": "//android.widget.EditText[@resource-id='com.android.chrome:id/url_bar']"
-            },
-            {
-              "type": "xpath",
-              "value": "//android.widget.EditText[@text='edition.cnn.com']"
             }
           ]
         }
@@ -60,7 +56,7 @@
     {
       "id": "17001",
       "context": "NATIVE",
-      "actionJson": "{\"command\":\"sendKeys\",\"value\":\"cnn.com\"}",
+      "actionJson": "{\"command\":\"sendKeys\",\"value\":\"kobiton \"}",
       "findingElementTimeout": 4014,
       "isOnKeyboard": false
     },
@@ -73,68 +69,37 @@
     },
     {
       "id": "17003",
+      "context": "WEB",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "css",
+              "value": "a[href='https://kobiton.com/']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.359\",\"y\":\"0.300\"}",
+      "findingElementTimeout": 8965,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17004",
       "context": "NATIVE",
       "actionJson": "{\"command\":\"rotate\",\"orientation\":\"LANDSCAPE\"}",
       "findingElementTimeout": 14108,
       "isOnKeyboard": false
     },
     {
-      "id": "17004",
+      "id": "17005",
       "context": "NATIVE",
       "actionJson": "{\"command\":\"rotate\",\"orientation\":\"PORTRAIT\"}",
       "findingElementTimeout": 8271,
       "isOnKeyboard": false
     },
     {
-      "id": "17005",
-      "context": "WEB",
-      "selectorConfigurations": [
-        {
-          "selectors": [
-            {
-              "type": "xpath",
-              "value": "/html/body/header/div/nav/div/div/div/div[1]/button/svg/path[1]"
-            }
-          ]
-        }
-      ],
-      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.559\",\"y\":\"0.000\"}",
-      "findingElementTimeout": 8965,
-      "isOnKeyboard": false
-    },
-    {
       "id": "17006",
-      "context": "NATIVE",
-      "selectorConfigurations": [
-        {
-          "selectors": [
-            {
-              "type": "xpath",
-              "value": "//android.widget.TextView[@text='Biden arrives in Israel after Gaza hospital blast turmoil']"
-            }
-          ]
-        }
-      ],
-      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.297\",\"y\":\"0.230\"}",
-      "findingElementTimeout": 10128,
-      "isOnKeyboard": false
-    },
-    {
-      "id": "17007",
-      "context": "NATIVE",
-      "actionJson": "{\"command\":\"sendKeys\",\"value\":\"uk\"}",
-      "findingElementTimeout": 4039,
-      "isOnKeyboard": false
-    },
-    {
-      "id": "17008",
-      "context": "NATIVE",
-      "actionJson": "{\"command\":\"press\",\"value\":\"ENTER\"}",
-      "findingElementTimeout": 3277,
-      "isOnKeyboard": false
-    },
-    {
-      "id": "17009",
       "context": "NATIVE",
       "selectorConfigurations": [
         {
@@ -151,27 +116,10 @@
       "isOnKeyboard": false
     },
     {
-      "id": "17010",
+      "id": "17007",
       "context": "NATIVE",
       "actionJson": "{\"command\":\"press\",\"value\":\"BACK\"}",
       "findingElementTimeout": 6526,
-      "isOnKeyboard": false
-    },
-    {
-      "id": "17011",
-      "context": "NATIVE",
-      "selectorConfigurations": [
-        {
-          "selectors": [
-            {
-              "type": "xpath",
-              "value": "/hierarchy/android.widget.FrameLayout[3]/android.widget.FrameLayout[1]"
-            }
-          ]
-        }
-      ],
-      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.079\",\"y\":\"0.173\"}",
-      "findingElementTimeout": 8360,
       "isOnKeyboard": false
     }
   ],
@@ -254,7 +202,7 @@
         },
         {
           "key": "deviceGroup",
-          "value": "ORGANIZATION",
+          "value": "KOBITON",
           "type": "string"
         },
         {
@@ -271,11 +219,6 @@
           "key": "platformName",
           "value": "Android",
           "type": "string"
-        },
-        {
-          "key": "kobiton:baselineSessionId",
-          "value": "605",
-          "type": "int"
         }
       ]
     }

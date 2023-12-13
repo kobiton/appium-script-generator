@@ -578,8 +578,14 @@ namespace AppiumTest
         {
             Console.WriteLine($"Swipe from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y}) with duration {durationInMs}");
 
-            TouchAction swipe = new TouchAction(driver);
-            swipe.Press(fromPoint.X, fromPoint.Y).Wait(durationInMs).MoveTo(toPoint.X, toPoint.Y).Release().Perform();
+            PointerInputDevice finger = new PointerInputDevice(PointerKind.Touch, "finger");
+            ActionSequence sequence = new ActionSequence(finger, 0);
+            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.FromMilliseconds(0)));
+            sequence.AddAction(finger.CreatePointerDown(MouseButton.Left));
+            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y, TimeSpan.FromMilliseconds(durationInMs)));
+            sequence.AddAction(finger.CreatePointerUp(MouseButton.Left));
+
+            driver.PerformActions(new List<ActionSequence> {sequence});
         }
 
         /**
