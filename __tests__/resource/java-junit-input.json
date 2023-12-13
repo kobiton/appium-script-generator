@@ -74,8 +74,8 @@
         {
           "selectors": [
             {
-              "type": "xpath",
-              "value": "//a[@href='https://kobiton.com/']"
+              "type": "css",
+              "value": "a[href='https://kobiton.com/']"
             }
           ]
         }
