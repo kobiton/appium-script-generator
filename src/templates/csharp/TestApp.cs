@@ -35,7 +35,7 @@ namespace AppiumTest
         public override void Setup(AppiumOptions desiredCaps, double retinaScale)
         {
             base.Setup(desiredCaps, retinaScale);
-            Console.WriteLine($"View session at: {{portalUrl}}/session/{GetKobitonSessionId()}");
+            Console.WriteLine($"View session at: {{portalUrl}}/sessions/{GetKobitonSessionId()}");
         }
 
         [TearDown]
