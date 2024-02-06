@@ -302,7 +302,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       switch (actionCommand) {
         case 'activateApp': {
           const {appPackage} = action
-          lines.push(new Line(`driver.activateApp("${appPackage}");`))
+          lines.push(new Line(`driver.ActivateApp("${appPackage}");`))
         } break
 
         case 'touchOnElement': {
