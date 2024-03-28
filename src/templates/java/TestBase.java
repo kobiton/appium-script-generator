@@ -205,7 +205,7 @@ public class TestBase {
 
             // Sometimes, the webview context is not switched successfully. So we need to retry and do more times.
             int maxTryTimes = 5;
-            int waitIntervalInMs = 10000;
+            int waitIntervalInMs = 3000;
             Utils.retry(new Utils.Task<String>() {
                 @Override
                 String exec(int attempt) throws Exception {
@@ -400,7 +400,7 @@ public class TestBase {
         System.out.println(String.format("Find visible web element by: %s", locatorText));
 
         int maxTryTimes = 5;
-        int waitIntervalInMs = 10000;
+        int waitIntervalInMs = 3000;
         setImplicitWaitInMiliSecond(0);
         MobileElement visibleElement = Utils.retry(new Utils.Task<MobileElement>() {
             @Override
