@@ -196,17 +196,38 @@ public class TestBase {
 
     public Rectangle findWebElementRect(boolean isOnKeyboard, By... locatorVarName) throws Exception {
         System.out.println(String.format("Finding webview element rectangle with locator %s", locatorVarName));
-        if (!isOnKeyboard) {
-            hideKeyboard();
+
+        MobileElement elementVarName = null;
+        try {
+            if (!isOnKeyboard) {
+                hideKeyboard();
+            }
+
+            // Sometimes, the webview context is not switched successfully. So we need to retry and do more times.
+            int maxTryTimes = 5;
+            int waitIntervalInMs = 3000;
+            Utils.retry(new Utils.Task<String>() {
+                @Override
+                String exec(int attempt) throws Exception {
+                    return switchToWebContext();
+                }
+            },  maxTryTimes, waitIntervalInMs);
+
+            elementVarName = findVisibleWebElement(locatorVarName);
+            scrollToWebElement(elementVarName);
+        }
+        catch (Exception e) {
+            throw new Exception("Cannot find webview element, error: " + e.getMessage());
         }
 
-        switchToWebContext();
-        MobileElement elementVarName = findVisibleWebElement(locatorVarName);
-        scrollToWebElement(elementVarName);
-
-        Rectangle webRectVarName = getWebElementRect(elementVarName);
-        switchToNativeContext();
-        return calculateNativeRect(webRectVarName);
+        try {
+            Rectangle webRectVarName = getWebElementRect(elementVarName);
+            switchToNativeContext();
+            return calculateNativeRect(webRectVarName);
+        }
+        catch (Exception e) {
+            throw new Exception("Cannot calculate native rect for webview element, error: " + e.getMessage());
+        }
     }
 
     public Object executeScriptOnWebElement(MobileElement element, String command) throws Exception {
@@ -378,19 +399,34 @@ public class TestBase {
         String locatorText = Utils.getLocatorText(locators);
         System.out.println(String.format("Find visible web element by: %s", locatorText));
 
-        List<MobileElement> foundElements = findElementsBy(locators);
-        MobileElement visibleElement = null;
-        for (MobileElement element : foundElements) {
-            String res = (String) executeScriptOnWebElement(element, "isElementVisible");
-            boolean visible = "true".equals(res);
-            if (visible) {
-                visibleElement = element;
-                break;
-            }
-        }
+        int maxTryTimes = 5;
+        int waitIntervalInMs = 3000;
+        setImplicitWaitInMiliSecond(0);
+        MobileElement visibleElement = Utils.retry(new Utils.Task<MobileElement>() {
+            @Override
+            MobileElement exec(int attempt) throws Exception {
+                List<MobileElement> foundElements = findElementsBy(locators);
 
-        if (visibleElement != null) return visibleElement;
-        throw new Exception(String.format("Cannot find visible web element by: %s", locatorText));
+                MobileElement foundVisibleElement = null;
+                for (MobileElement element : foundElements) {
+                    String res = (String) executeScriptOnWebElement(element, "isElementVisible");
+                    boolean visible = "true".equals(res);
+                    if (visible) {
+                        foundVisibleElement = element;
+                        break;
+                    }
+                }
+
+                if (foundVisibleElement == null) {
+                    throw new Exception(String.format("Cannot find visible web element by: %s", locators));
+                }
+
+                return foundVisibleElement;
+            }
+        }, maxTryTimes, waitIntervalInMs);
+        setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
+
+        return visibleElement;
     }
 
     public MobileElement findWebview() {
