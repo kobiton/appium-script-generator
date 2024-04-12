@@ -580,7 +580,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
     }
 
     configCode = configCode.replace('{{kobiton_api_url}}', serverInfo.apiUrl)
-    configCode = configCode.replace('{{app_version}}', appUnderTest.appVersionId)
     configCode = configCode.replace('{{baseUrl}}', serverInfo.apiUrl)
     configCode = configCode.replace(
       '{{desiredCaps}}', this._buildCSharpCode(desiredCapsMethodLines, 1))

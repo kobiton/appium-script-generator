@@ -17,7 +17,6 @@ public class Config {
     public static final int SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS = 3000;
     public static final String KOBITON_API_URL = "{{kobiton_api_url}}";
     {{kobitonCredential}}
-    public static final String APP_VERSION = "{{app_version}}";
 
     public static String getBasicAuthString() {
         String authString = KOBITON_USERNAME + ":" + KOBITON_API_KEY;

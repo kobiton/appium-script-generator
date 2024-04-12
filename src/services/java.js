@@ -586,7 +586,6 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
     }
 
     configCode = configCode.replace('{{kobiton_api_url}}', serverInfo.apiUrl)
-    configCode = configCode.replace('{{app_version}}', appUnderTest.appVersionId)
     configCode = configCode.replace('{{baseUrl}}', serverInfo.apiUrl)
     configCode = configCode.replace(
       '{{desiredCaps}}', this._buildJavaCode(desiredCapsMethodLines, 1))
