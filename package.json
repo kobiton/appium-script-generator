@@ -16,6 +16,7 @@
   "dependencies": {
     "@grpc/grpc-js": "1.8.14",
     "@grpc/proto-loader": "0.7.6",
+    "@kobiton/core-service": "3.0.26",
     "@xmldom/xmldom": "0.8.7",
     "archiver": "5.3.1",
     "bluebird": "3.7.2",
