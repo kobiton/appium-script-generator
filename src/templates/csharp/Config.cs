@@ -23,7 +23,6 @@ namespace AppiumTest
         public const int SleepTimeBeforeSendKeysInMs = 3000;
         public const string KobitonApiUrl = "{{KobitonApiUrl}}";
         {{kobitonCredential}}
-        public const string AppVersion = "{{app_version}}";
 
         public static string GetBasicAuthString()
         {

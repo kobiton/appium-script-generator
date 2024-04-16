@@ -4,7 +4,7 @@ import {URL} from 'url'
 import get from 'lodash/get'
 import upperFirst from 'lodash/upperFirst'
 import camelCase from 'lodash/camelCase'
-import {FRAMEWORK_NAMES, DEVICE_SOURCES, CONTEXTS, LANGUAGES} from './constant'
+import {DEVICE_SOURCES, CONTEXTS, LANGUAGES} from './constant'
 import {buildCode, Line} from '../models/line'
 import compress from '../utils/compress'
 import {readFile, writeFile, createDir} from '../utils/fs-wrapper'
@@ -216,35 +216,21 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       testCaseLines.push(new Line(`public void ${testCaseMethodName}() {`))
       testCaseLines.push(new Line('try', 1))
       testCaseLines.push(new Line('{'))
-      if (testingFramework === FRAMEWORK_NAMES.NUNIT) {
-        if (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName) {
-          testCaseLines.push(new Line(
-            `AppiumOptions capabilities = Config.${desiredCapsMethodName}();`, 1))
-        }
-        else {
-          testCaseLines.push(new Line('String appURL = GetAppUrl();', 1))
-          testCaseLines.push(new Line(
-            `AppiumOptions capabilities = Config.${desiredCapsMethodName}(appURL);`))
-        }
-        testCaseLines.push(new Line('FindOnlineDevice(capabilities);'))
-        testCaseLines.push(new Line(`Setup(capabilities, ${retinaScale});`))
-        testCaseLines.push(new Line('RunTest();'))
+
+      if (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName) {
+        testCaseLines.push(new Line(
+          `AppiumOptions capabilities = Config.${desiredCapsMethodName}();`, 1))
       }
-      else if (testingFramework === FRAMEWORK_NAMES.TESTNG) {
-        testCaseLines.push(new Line('TestApp testApp = new TestApp();', 1))
-        if (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName) {
-          testCaseLines.push(new Line(
-            `AppiumOptions capabilities = Config.${desiredCapsMethodName}();`))
-        }
-        else {
-          testCaseLines.push(new Line('String appURL = testApp.getAppUrl();'))
-          testCaseLines.push(new Line(
-            `AppiumOptions capabilities = Config.${desiredCapsMethodName}(appURL);`))
-        }
-        testCaseLines.push(new Line('testApp.FindOnlineDevice(capabilities);'))
-        testCaseLines.push(new Line(`testApp.Setup(capabilities, ${retinaScale});`))
-        testCaseLines.push(new Line('testApp.RunTest();'))
+      else {
+        testCaseLines.push(new Line(`String appURL = GetAppUrl(${appUnderTest.appVersionId});`, 1))
+        testCaseLines.push(new Line(
+          `AppiumOptions capabilities = Config.${desiredCapsMethodName}(appURL);`))
       }
+
+      testCaseLines.push(new Line('FindOnlineDevice(capabilities);'))
+      testCaseLines.push(new Line(`Setup(capabilities, ${retinaScale});`))
+      testCaseLines.push(new Line('RunTest();'))
+
       testCaseLines.push(new Line('}', -1))
       testCaseLines.push(new Line('catch (Exception ex)'))
       testCaseLines.push(new Line('{'))
@@ -580,7 +566,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
     }
 
     configCode = configCode.replace('{{kobiton_api_url}}', serverInfo.apiUrl)
-    configCode = configCode.replace('{{app_version}}', appUnderTest.appVersionId)
     configCode = configCode.replace('{{baseUrl}}', serverInfo.apiUrl)
     configCode = configCode.replace(
       '{{desiredCaps}}', this._buildCSharpCode(desiredCapsMethodLines, 1))

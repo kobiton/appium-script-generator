@@ -1031,11 +1031,11 @@ public class TestBase {
         return device;
     }
 
-    public String getAppUrl() throws Exception {
+    public String getAppUrl(int appVersionId) throws Exception {
         String appUrl = "";
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-            .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, Config.APP_VERSION))
+            .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
             .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             .addHeader(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
             .build();

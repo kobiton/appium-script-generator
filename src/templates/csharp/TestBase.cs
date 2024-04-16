@@ -945,7 +945,7 @@ namespace AppiumTest
             }
         }
 
-        public string GetAppUrl()
+        public string GetAppUrl(int appVersionId)
         {
             string appUrl = string.Empty;
             using (HttpClient client = new HttpClient())
@@ -953,7 +953,7 @@ namespace AppiumTest
                 client.DefaultRequestHeaders.Add("Content-Type", "application/json");
                 client.DefaultRequestHeaders.Add("Authorization", Config.GetBasicAuthString());
 
-                string url = string.Format("{0}/v1/app/versions/{1}/downloadUrl", Config.KobitonApiUrl, Config.AppVersion);
+                string url = string.Format("{0}/v1/app/versions/{1}/downloadUrl", Config.KobitonApiUrl, appVersionId);
 
                 using (HttpResponseMessage response = client.GetAsync(url).Result)
                 {

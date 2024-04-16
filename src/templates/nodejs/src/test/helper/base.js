@@ -802,7 +802,7 @@ export default class TestBase {
     return device
   }
 
-  async getAppUrl() {
+  async getAppUrl(appVersionId) {
     const config = {
       headers: {
         Authorization: Config.getBasicAuthString(),
@@ -811,7 +811,7 @@ export default class TestBase {
     }
 
     const {body} = await axios.get(
-      `${Config.kobitonApiUrl}/v1/app/versions/${Config.appVersion}/downloadUrl`,
+      `${Config.kobitonApiUrl}/v1/app/versions/${appVersionId}/downloadUrl`,
       config
     )
 
