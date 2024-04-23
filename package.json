@@ -21,6 +21,7 @@
     "bluebird": "3.7.2",
     "del": "2.2.0",
     "google-protobuf": "3.21.2",
+    "grpc-health-check": "^2.0.1",
     "keymirror": "0.1.1",
     "lodash": "4.17.21",
     "moment": "2.29.4",

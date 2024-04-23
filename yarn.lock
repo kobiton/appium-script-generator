@@ -874,6 +874,16 @@
     protobufjs "^7.2.4"
     yargs "^17.7.2"
 
+"@grpc/proto-loader@^0.7.10":
+  version "0.7.12"
+  resolved "https://registry.yarnpkg.com/@grpc/proto-loader/-/proto-loader-0.7.12.tgz#787b58e3e3771df30b1567c057b6ab89e3a42911"
+  integrity sha512-DCVwMxqYzpUCiDMl7hQ384FqP4T3DbNpXU8pt681l3UWCip1WUiD5JrkImUwCB9a7f2cq4CUTmi5r/xIMRPY1Q==
+  dependencies:
+    lodash.camelcase "^4.3.0"
+    long "^5.0.0"
+    protobufjs "^7.2.4"
+    yargs "^17.7.2"
+
 "@istanbuljs/load-nyc-config@^1.0.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@istanbuljs/load-nyc-config/-/load-nyc-config-1.1.0.tgz#fd3db1d59ecf7cf121e80650bb86712f9b55eced"
@@ -2979,6 +2989,13 @@ graceful-fs@^4.1.11, graceful-fs@^4.1.2, graceful-fs@^4.2.0, graceful-fs@^4.2.9:
   version "4.2.11"
   resolved "https://registry.yarnpkg.com/graceful-fs/-/graceful-fs-4.2.11.tgz#4183e4e8bf08bb6e05bbb2f7d2e0c8f712ca40e3"
   integrity sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==
+
+grpc-health-check@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/grpc-health-check/-/grpc-health-check-2.0.1.tgz#e240b1f10ad6e9020170816248a928643d6ea427"
+  integrity sha512-y7rZrQiLzN3OmnGtDtaAfnxwkwl1oSNjpq2nszNP/k7qp/3jM1fcfX0xHTi00LqmhGGdwPeSfoAfs43fYj5INw==
+  dependencies:
+    "@grpc/proto-loader" "^0.7.10"
 
 has-bigints@^1.0.1, has-bigints@^1.0.2:
   version "1.0.2"
