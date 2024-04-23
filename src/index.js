@@ -15,7 +15,7 @@ const serviceDefinition = protoLoader.loadSync(SERVICE_PROTO_FILE, {
 const serviceProto = grpcJs.loadPackageDefinition(serviceDefinition).kobiton
 
 const servingStatusMap = {
-  '': 'SERVING'
+  '': 'SERVING' // The empty string means that the server is serving all services.
 }
 
 /**
