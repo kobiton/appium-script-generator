@@ -527,47 +527,47 @@ namespace AppiumTest
 
             var touchableElement = Utils.Retry<AppiumWebElement>(
                 (attempt) =>
-            {
-                try
                 {
-                    return FindElementBy(null, Config.VisibilityTimeoutInMs, locators);
-                }
-                catch (Exception e)
-                {
-                    potentialXpathList.Clear();
-                    var source = new XmlDocument();
-                    source.LoadXml(driver.PageSource);
-                    var elementsByTagName = source.GetElementsByTagName(sourceElement.Name);
-                    foreach (XmlNode itemNode in elementsByTagName)
+                    try
                     {
-                        if (itemNode.NodeType != XmlNodeType.Element) continue;
-
-                        var isEqual = compareNodes(sourceElement, itemNode);
-                        if (isEqual) {
-                            potentialXpathList.Add(Utils.GetXPathOfNode(itemNode));
-                        }
+                        return FindElementBy(null, Config.VisibilityTimeoutInMs, locators);
                     }
+                    catch (Exception e)
+                    {
+                        potentialXpathList.Clear();
+                        var source = new XmlDocument();
+                        source.LoadXml(driver.PageSource);
+                        var elementsByTagName = source.GetElementsByTagName(sourceElement.Name);
+                        foreach (XmlNode itemNode in elementsByTagName)
+                        {
+                            if (itemNode.NodeType != XmlNodeType.Element) continue;
 
-                    if (!potentialXpathList.IsNullOrEmpty()) {
-                        foreach (var xpath in potentialXpathList) {
-                            if (sourceElementXpath.Equals(xpath)) {
-                                targetElementXpath = xpath;
-                                break;
+                            var isEqual = compareNodes(sourceElement, itemNode);
+                            if (isEqual) {
+                                potentialXpathList.Add(Utils.GetXPathOfNode(itemNode));
+                            }
+                        }
+
+                        if (!potentialXpathList.IsNullOrEmpty()) {
+                            foreach (var xpath in potentialXpathList) {
+                                if (sourceElementXpath.Equals(xpath)) {
+                                    targetElementXpath = xpath;
+                                    break;
+                                }
+                            }
+
+                            if (targetElementXpath == null) {
+                                targetElementXpath = potentialXpathList[0];
                             }
                         }
 
                         if (targetElementXpath == null) {
-                            targetElementXpath = potentialXpathList[0];
+                            throw new Exception();
                         }
-                    }
 
-                    if (targetElementXpath == null) {
-                        throw new Exception();
+                        return FindElementBy(By.XPath(targetElementXpath.Replace(IosXpathRedundantPrefix, "")));
                     }
-
-                    return FindElementBy(By.XPath(targetElementXpath.Replace(IosXpathRedundantPrefix, "")));
-                }
-            },
+                },
                 (exception, attempt) =>
                 {
                     Console.WriteLine($"Cannot find touchable element, ${Utils.ConvertToOrdinal(attempt)} attempt");
@@ -592,6 +592,7 @@ namespace AppiumTest
 
                         DragFromPoint(center, 0, -0.5);
                     }
+                    
                     return 0;
                 }, 10, 0);
 
