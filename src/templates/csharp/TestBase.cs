@@ -505,7 +505,6 @@ namespace AppiumTest
         /**
          * Scroll to find best element to touch
          */
-
         public void TouchOnScrollableElement(By[] locators, string commandId)
         {
             var currentCommandId = GetCurrentCommandId();
