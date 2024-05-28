@@ -22,7 +22,7 @@ export default class Proxy {
 
     const server = http.createServer((req, res) => {
       const url = new URL(`${this.getServerUrl()}${req.url}`)
-      url.searchParams.set('baseCommandId', this._currentCommandId)
+      this._currentCommandId && url.searchParams.set('baseCommandId', this._currentCommandId)
       req.url = url.toString().replace(this.getServerUrl(), '')
       this._proxy.web(req, res, {
         target: Config.appiumServerUrl,

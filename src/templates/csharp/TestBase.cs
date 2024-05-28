@@ -7,13 +7,14 @@ using OpenQA.Selenium.Appium.MultiTouch;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium;
 using System.Drawing;
-
+using System.Globalization;
 using Castle.Core.Internal;
 using System.Text;
 using HtmlAgilityPack;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Net;
+using System.Xml;
 using OpenQA.Selenium.Interactions;
 
 namespace AppiumTest
@@ -22,11 +23,11 @@ namespace AppiumTest
     {
         public enum PressTypes { Home, Back, Power, AppSwitch, Enter, Delete }
 
-        public AppiumDriver<AppiumWebElement> driver;
-        public AppiumOptions options;
-        public ProxyServer proxy;
+        public AppiumDriver<AppiumWebElement>? driver;
+        public AppiumOptions? options;
+        public ProxyServer? proxy;
         public bool isIos;
-        public Point screenSize;
+        public Point? screenSize;
         public double retinaScale;
         public string deviceName, platformVersion;
         public HttpClient httpClient = new HttpClient();
@@ -319,7 +320,7 @@ namespace AppiumTest
             return nativeRect;
         }
 
-        private List<AppiumWebElement> FindElements(AppiumWebElement rootElement, int timeoutInMiliSeconds, bool multiple, params By[] locators)
+        private List<AppiumWebElement> FindElements(AppiumWebElement? rootElement, int timeoutInMiliSeconds, bool multiple, params By[] locators)
         {
             string locatorText = Utils.GetLocatorText(locators);
             Console.WriteLine($"Find element by: {locatorText}");
@@ -373,13 +374,13 @@ namespace AppiumTest
                     SetImplicitWaitInMiliSecond(Config.ImplicitWaitInMs);
                     throw new Exception(notFoundMessage);
 
-                }, timeoutInMiliSeconds / (waitInterval * 1000), waitInterval * 1000);
+                }, null, timeoutInMiliSeconds / (waitInterval * 1000), waitInterval * 1000);
             }
         }
 
 
 
-        public AppiumWebElement FindElementBy(AppiumWebElement rootElement, int timeoutInMiliSeconds, params By[] locators)
+        public AppiumWebElement FindElementBy(AppiumWebElement? rootElement, int timeoutInMiliSeconds, params By[] locators)
         {
             List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, false, locators);
                 if (foundElements == null || foundElements.Count != 1) {
@@ -497,13 +498,113 @@ namespace AppiumTest
         public TouchAction TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX, double relativePointY)
         {
             Console.WriteLine($"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
-            Rectangle topToolbarRect = new Rectangle(
-                element.Location.X,
-                element.Location.Y,
-                element.Size.Width,
-                element.Size.Height
-            );
-            return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, topToolbarRect));
+
+            return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
+        }
+
+        /**
+         * Scroll to find best element to touch
+         */
+        public void TouchOnScrollableElement(By[] locators, string commandId)
+        {
+            var currentCommandId = GetCurrentCommandId();
+            // Temporary disable adding baseCommandId to Appium request to avoid asserting wrong command
+            SetCurrentCommandId(0);
+
+            var infoJsonString = File.ReadAllText($"../../../test/resources/{commandId}.json", Encoding.UTF8);
+            dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
+
+            var sourceElementDoc = new XmlDocument();
+            sourceElementDoc.LoadXml((string) infoObject.touchedElementSource);
+            XmlNode sourceElement = sourceElementDoc.DocumentElement;
+            var screenSize = GetScreenSize();
+            string sourceElementXpath = (string) infoObject.touchedElementXpath;
+
+            AppiumWebElement? scrollableElement = null;
+            var potentialXpathList = new List<string>();
+            string? targetElementXpath = null;
+
+            var touchableElement = Utils.Retry<AppiumWebElement>(
+                (attempt) =>
+                {
+                    try
+                    {
+                        return FindElementBy(null, Config.VisibilityTimeoutInMs, locators);
+                    }
+                    catch (Exception e)
+                    {
+                        potentialXpathList.Clear();
+                        var source = new XmlDocument();
+                        source.LoadXml(driver.PageSource);
+                        var elementsByTagName = source.GetElementsByTagName(sourceElement.Name);
+                        foreach (XmlNode itemNode in elementsByTagName)
+                        {
+                            if (itemNode.NodeType != XmlNodeType.Element) continue;
+
+                            var isEqual = compareNodes(sourceElement, itemNode);
+                            if (isEqual) {
+                                potentialXpathList.Add(Utils.GetXPathOfNode(itemNode));
+                            }
+                        }
+
+                        if (!potentialXpathList.IsNullOrEmpty()) {
+                            foreach (var xpath in potentialXpathList) {
+                                if (sourceElementXpath.Equals(xpath)) {
+                                    targetElementXpath = xpath;
+                                    break;
+                                }
+                            }
+
+                            if (targetElementXpath == null) {
+                                targetElementXpath = potentialXpathList[0];
+                            }
+                        }
+
+                        if (targetElementXpath == null) {
+                            throw new Exception();
+                        }
+
+                        return FindElementBy(By.XPath(targetElementXpath.Replace(IosXpathRedundantPrefix, "")));
+                    }
+                },
+                (exception, attempt) =>
+                {
+                    Console.WriteLine($"Cannot find touchable element, ${Utils.ConvertToOrdinal(attempt)} attempt");
+                    if (scrollableElement == null)
+                    {
+                        scrollableElement = FindElementBy(By.XPath((string) infoObject.scrollableElementXpath));
+                        HideKeyboard();
+                    }
+
+                    if (attempt == 1)
+                    {
+                        SwipeToTop(Utils.GetCenterOfElement(scrollableElement));
+                    }
+                    else
+                    {
+                        var center = Utils.GetCenterOfElement(scrollableElement);
+                        var rect = scrollableElement.Rect;
+                        // Fix bug when scrollableElement is out of viewport
+                        if (center.Y > screenSize.Y || rect.Height < 0) {
+                            center.Y = screenSize.Y / 2;
+                        }
+
+                        DragFromPoint(center, 0, -0.5);
+                    }
+                    
+                    return 0;
+                }, 10, 0);
+
+            if (touchableElement == null) {
+                throw new Exception("Cannot find any element to touch");
+            }
+
+            SetCurrentCommandId(currentCommandId);
+            TouchAtRelativePointOfElement(
+                touchableElement,
+                Double.Parse((string) infoObject.touchedElementRelativeX, CultureInfo.InvariantCulture),
+                Double.Parse((string) infoObject.touchedElementRelativeY, CultureInfo.InvariantCulture)
+                );
         }
 
         /**
@@ -604,11 +705,29 @@ namespace AppiumTest
          */
         public void DragByPoint(Point fromPoint, Point toPoint)
         {
-            Console.WriteLine($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
+            PointerInputDevice finger = new PointerInputDevice(PointerKind.Touch, "finger");
+            ActionSequence sequence = new ActionSequence(finger, 0);
 
-            TouchAction swipe = new TouchAction(driver);
-            swipe.Press(fromPoint.X, fromPoint.Y).Wait(300).MoveTo(toPoint.X, toPoint.Y).Release();
-            swipe.Perform();
+            if (isIos)
+            {
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.FromMilliseconds(0)));
+                sequence.AddAction(finger.CreatePointerDown(MouseButton.Middle));
+                sequence.AddAction(finger.CreatePause(TimeSpan.FromMilliseconds(2000)));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y, TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePointerUp(MouseButton.Middle));
+            }
+            else
+            {
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.FromMilliseconds(0)));
+                sequence.AddAction(finger.CreatePointerDown(MouseButton.Middle));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y, TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePause(TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Pointer, 0, 0, TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePointerUp( MouseButton.Middle));
+            }
+
+            Console.WriteLine($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
+            driver.PerformActions(new List<ActionSequence> {sequence});
         }
 
         public void SendKeys(string keys)
@@ -796,14 +915,11 @@ namespace AppiumTest
         {
             if (screenSize == null) {
                 byte[] screenshotBytes = ((ITakesScreenshot)driver).GetScreenshot().AsByteArray;
-                MemoryStream inputStream = new MemoryStream(screenshotBytes);
-                Bitmap image = new Bitmap(inputStream);
-                int width = image.Width;
-                int height = image.Height;
-                screenSize = new Point(width, height);
+                var image = SkiaSharp.SKBitmap.Decode(new MemoryStream(screenshotBytes));
+                screenSize = new Point(image.Width, image.Height);
             }
 
-            return screenSize;
+            return (Point) screenSize;
         }
 
         public Point GetAppOffset()
@@ -863,16 +979,15 @@ namespace AppiumTest
             Thread.Sleep(durationInMs);
         }
 
-        protected bool compareNodes(HtmlNode expected, HtmlNode actual)
+        protected bool compareNodes(XmlNode? expected, XmlNode? actual)
         {
-            if (!expected.Name.Equals(actual.Name))
-            {
-                return false;
-            }
+            if (expected == null || actual == null) return false;
 
-            string[] compareAttrs = new string[] { "label", "text", "visible", "class", "name", "type", "resource-id", "content-desc", "accessibility-id" };
+            if (!expected.Name.Equals(actual.Name)) return false;
 
-            foreach (string attrName in compareAttrs) {
+            var compareAttrs = new string[] { "label", "text", "visible", "class", "name", "type", "resource-id", "content-desc", "accessibility-id" };
+
+            foreach (var attrName in compareAttrs) {
                 string v1 = null;
                 string v2 = null;
                 try
@@ -897,8 +1012,8 @@ namespace AppiumTest
 
             for (int i = 0; i < expected.ChildNodes.Count; i++)
             {
-                HtmlNode expectedChild = expected.ChildNodes.ElementAt(i);
-                HtmlNode actualChild = actual.ChildNodes.ElementAt(i);
+                XmlNode? expectedChild = expected.ChildNodes[i];
+                XmlNode? actualChild = actual.ChildNodes[i];
 
                 bool isEqual = compareNodes(expectedChild, actualChild);
                 if (!isEqual)
