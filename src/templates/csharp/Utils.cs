@@ -1,27 +1,26 @@
-﻿using NUnit.Framework;
-using OpenQA.Selenium;
-using System;
-using System.Collections.Generic;
+﻿using OpenQA.Selenium;
 using System.Drawing;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Xml;
+using OpenQA.Selenium.Appium;
 
 namespace AppiumTest
 {
     public static class Utils
     {
-        public static T Retry<T>(Func<int, T> task, int maxAttempts, int intervalInMs)
+        public static T Retry<T>(Func<int, T> execFn, Func<Exception, int, int>? handleExceptionFn = null,
+            int maxAttempts = 1, int intervalInMs = 0)
         {
             for (int attempt = 1; attempt <= Math.Max(maxAttempts, 1); attempt++)
             {
                 try
                 {
-                    return task.Invoke(attempt);
+                    return execFn.Invoke(attempt);
                 }
                 catch (Exception e)
                 {
-                    HandleException(e, attempt);
+                    handleExceptionFn?.Invoke(e, attempt);
+
                     if (attempt == maxAttempts)
                     {
                         throw e;
@@ -63,46 +62,82 @@ namespace AppiumTest
             {
                 locatorStrings.Add(locator.ToString());
             }
+
             return string.Join(", ", locatorStrings);
         }
 
         public static bool IsRectangleInclude(Rectangle rect1, Rectangle rect2)
         {
             return rect1.X <= rect2.X &&
-                rect1.Y <= rect2.Y &&
-                rect1.X + rect1.Width >= rect2.X + rect2.Width &&
-            rect1.Y + rect1.Height >= rect2.Y + rect2.Height;
+                   rect1.Y <= rect2.Y &&
+                   rect1.X + rect1.Width >= rect2.X + rect2.Width &&
+                   rect1.Y + rect1.Height >= rect2.Y + rect2.Height;
         }
 
-        public static void HandleException(Exception e, int attempt)
+        public static Point GetCenterOfElement(AppiumWebElement element)
         {
-            // Default implementation: do nothing
+            var location = element.Location;
+            var size = element.Size;
+            return new Point(location.X + size.Width / 2,location.Y + size.Height / 2);
         }
 
-        public static List<T> Retry<T>(Func<int, List<T>> task, int maxAttempts, int intervalInMs)
+        public static string GetXPathOfNode(XmlNode node)
         {
-            for (int attempt = 1; attempt <= Math.Max(maxAttempts, 1); attempt++)
+            StringBuilder xpath = new StringBuilder();
+
+            while (node != null)
             {
-                try
+                switch (node.NodeType)
                 {
-                    return task.Invoke(attempt);
-                }
-                catch (Exception e)
-                {
-                    HandleException(e, attempt);
-                    if (attempt == maxAttempts)
-                    {
-                        throw e;
-                    }
-                }
+                    case XmlNodeType.Attribute:
+                        xpath.Insert(0, "/@" + node.Name);
+                        node = ((XmlAttribute)node).OwnerElement;
+                        break;
+                    case XmlNodeType.Element:
+                        int indexInParent = GetElementIndexInParent((XmlElement)node);
+                        string nodeName = node.Name;
 
-                if (intervalInMs > 0)
-                {
-                    Thread.Sleep(intervalInMs);
+                        if (indexInParent > 0)
+                        {
+                            nodeName += $"[{indexInParent}]";
+                        }
+
+                        xpath.Insert(0, "/" + nodeName);
+                        node = node.ParentNode;
+                        break;
+                    case XmlNodeType.Document:
+                        return xpath.ToString();
+                    default:
+                        throw new ArgumentException("Unsupported XmlNode type: " + node.NodeType);
                 }
             }
 
-            return default(List<T>);
+            return xpath.ToString();
+        }
+
+        private static int GetElementIndexInParent(XmlElement element)
+        {
+            XmlNode parentNode = element.ParentNode;
+            if (parentNode == null)
+            {
+                return 0;
+            }
+
+            int index = 1;
+            foreach (XmlNode sibling in parentNode.ChildNodes)
+            {
+                if (sibling == element)
+                {
+                    return parentNode.ChildNodes.Count == 1 ? 0 : index;
+                }
+
+                if (sibling is XmlElement)
+                {
+                    index++;
+                }
+            }
+
+            return 0;
         }
     }
 }
