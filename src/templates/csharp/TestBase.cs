@@ -440,16 +440,7 @@ namespace AppiumTest
 
         public bool IsButtonElement(AppiumWebElement element)
         {
-            try
-            {
-                string tagName = element.GetAttribute("tagName");
-                return !string.IsNullOrEmpty(tagName) && tagName.Trim().ToLower() == "button";
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error when retrieving tag name: " + ex.Message);
-                return false;
-            }
+            return element.TagName.Contains("Button");
         }
 
         public AppiumWebElement FindVisibleWebElement(params By[] locators)
