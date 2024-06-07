@@ -591,7 +591,7 @@ namespace AppiumTest
 
                         DragFromPoint(center, 0, -0.5);
                     }
-                    
+
                     return 0;
                 }, 10, 0);
 
@@ -736,35 +736,44 @@ namespace AppiumTest
 
             Console.WriteLine($"Send keys: {keys}");
 
-            if (this.isIos) {
-                var uri = new UriBuilder($"{GetAppiumServerUrl()}session/{driver.SessionId}/keys");
-                var query = new Dictionary<string, string>
+            if (isIos) {
+                var chars = keys.ToCharArray();
+                var requestJson = new JObject
                 {
-                    {"value", keys}
+                    ["value"] = JArray.FromObject(chars)
                 };
-                uri.Query = new FormUrlEncodedContent(query).ReadAsStringAsync().Result;
-                var request = new HttpRequestMessage{
-                    Method = HttpMethod.Post,
-                    RequestUri = uri.Uri,
-                    Headers = {
-                        {
-                            HttpRequestHeader.Authorization.ToString(), Config.GetBasicAuthString()
-                        }
-                    }
-                };
-                httpClient.SendAsync(request).Wait();
-           } else
-           {
-                Actions action = new Actions(driver);
 
-                foreach (char c in keys)
+                StringContent requestBody = new StringContent(requestJson.ToString(), Encoding.UTF8, "application/json");
+
+                var sendKeysRequest = new HttpRequestMessage(HttpMethod.Post, $"{GetAppiumServerUrl()}/session/{driver.SessionId}/keys")
                 {
-                    string key = c.ToString();
-                    action.SendKeys(key);
+                    Content = requestBody
+                };
+
+                var response = httpClient.SendAsync(sendKeysRequest).Result;
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception(response.Content.ReadAsStringAsync().Result);
                 }
+            } else
+            {
+                try
+                {
+                    KeyInputDevice keyInput = new KeyInputDevice("keyboard");
+                    ActionSequence sequence = new ActionSequence(keyInput, 0);
+                    for (int index = 0; index < keys.Length; index++)
+                    {
+                        var charAt = keys[index];
+                        sequence.AddAction(keyInput.CreateKeyDown(charAt));
+                        sequence.AddAction(keyInput.CreateKeyUp(charAt));
+                    }
 
-                action.Perform();
-                sleep(SleepAfterAction);
+                    driver.PerformActions(new List<ActionSequence> {sequence});
+                }
+                catch (Exception ignored)
+                {
+                    GetAndroidDriver().Keyboard.SendKeys(keys);
+                }
             }
         }
 
@@ -798,7 +807,12 @@ namespace AppiumTest
                     }
                     else
                     {
-                            driver.ExecuteScript("mobile: pressButton");//, ImmutableMap.of("name", "home"));
+                        var scriptArgs = new Dictionary<string, object>
+                        {
+                            {"name", "home"}
+                        };
+
+                        driver.ExecuteScript("mobile: pressButton", scriptArgs);
                     }
                 }
                 else
@@ -817,7 +831,7 @@ namespace AppiumTest
                     IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
                     if (iosDriver.IsLocked())
                     {
-                        iosDriver.Lock();
+                        iosDriver.Unlock();
                     }
                     else
                     {
