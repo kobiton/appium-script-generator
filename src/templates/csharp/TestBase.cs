@@ -1,5 +1,4 @@
-﻿
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using OpenQA.Selenium.Appium.Android;
 using OpenQA.Selenium.Appium.Enums;
 using OpenQA.Selenium.Appium.iOS;
@@ -21,7 +20,15 @@ namespace AppiumTest
 {
     public class TestBase
     {
-        public enum PressTypes { Home, Back, Power, AppSwitch, Enter, Delete }
+        public enum PressTypes
+        {
+            Home,
+            Back,
+            Power,
+            AppSwitch,
+            Enter,
+            Delete
+        }
 
         public AppiumDriver<AppiumWebElement>? driver;
         public AppiumOptions? options;
@@ -41,9 +48,11 @@ namespace AppiumTest
         {
             this.options = desiredCaps;
             this.retinaScale = retinaScale;
-            this.isIos = MobilePlatform.IOS.Equals(desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.PlatformName).ToString());
-            this.deviceName= desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName).ToString();
-            this.platformVersion = desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion).ToString();
+            this.isIos = MobilePlatform.IOS.Equals(desiredCaps.ToCapabilities()
+                .GetCapability(MobileCapabilityType.PlatformName).ToString());
+            this.deviceName = desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName).ToString();
+            this.platformVersion = desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion)
+                .ToString();
 
             if (Config.DeviceSource == Config.DeviceSourceEnums.Kobiton)
             {
@@ -96,7 +105,8 @@ namespace AppiumTest
 
         public string SwitchToWebContext()
         {
-            for (int tryTime = 1; tryTime <= 3; tryTime++) {
+            for (int tryTime = 1; tryTime <= 3; tryTime++)
+            {
                 Console.WriteLine($"Find a web context, {Utils.ConvertToOrdinal(tryTime)} time");
                 List<ContextInfo> contextInfos = new List<ContextInfo>();
 
@@ -107,7 +117,7 @@ namespace AppiumTest
                 List<string> nativeTexts = new List<string>();
                 var textNodes = nativeDocument.DocumentNode.SelectNodes(textNodeSelector);
 
-                if(textNodes != null)
+                if (textNodes != null)
                 {
                     foreach (HtmlNode element in nativeDocument.DocumentNode.SelectNodes(textNodeSelector))
                     {
@@ -174,7 +184,8 @@ namespace AppiumTest
                 if (!contextInfos.IsNullOrEmpty())
                 {
                     string bestWebContext;
-                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.matchTextsPercent - c1.matchTextsPercent));
+                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
+                        (int)(c2.matchTextsPercent - c1.matchTextsPercent));
                     if (contextInfos[0].matchTextsPercent > 40)
                     {
                         bestWebContext = contextInfos[0].context;
@@ -207,7 +218,8 @@ namespace AppiumTest
         public Rectangle FindWebElementRect(bool isOnKeyboard, params By[] locatorVarName)
         {
             Console.WriteLine($"Finding webview element rectangle with locator {locatorVarName}");
-            if (!isOnKeyboard) {
+            if (!isOnKeyboard)
+            {
                 HideKeyboard();
             }
 
@@ -234,7 +246,7 @@ namespace AppiumTest
 
         public Rectangle GetWebElementRect(AppiumWebElement element)
         {
-            string resultString = (string) ExecuteScriptOnWebElement(element, "getBoundingClientRect");
+            string resultString = (string)ExecuteScriptOnWebElement(element, "getBoundingClientRect");
             dynamic resultJson = JsonConvert.DeserializeObject(resultString);
             Rectangle rect = new Rectangle(
                 (int)(Convert.ToInt64(resultJson.x) / retinaScale),
@@ -257,10 +269,13 @@ namespace AppiumTest
             );
 
             AppiumWebElement topToolbar = null;
-            if (this.isIos) {
+            if (this.isIos)
+            {
                 try
                 {
-                    topToolbar = FindElementBy(By.XPath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
+                    topToolbar =
+                        FindElementBy(By.XPath(
+                            "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
                 }
                 catch (Exception ignored)
                 {
@@ -279,7 +294,8 @@ namespace AppiumTest
                             int.Parse(firstChildElement.Attributes["height"].Value)
                         );
 
-                        if (!webviewRect.Equals(firstChildRect) && Utils.IsRectangleInclude(webviewRect, firstChildRect))
+                        if (!webviewRect.Equals(firstChildRect) &&
+                            Utils.IsRectangleInclude(webviewRect, firstChildRect))
                         {
                             string topToolbarXpath = firstChildElement.XPath.Replace(IosXpathRedundantPrefix, "");
                             topToolbar = FindElementBy(By.XPath(topToolbarXpath));
@@ -292,7 +308,8 @@ namespace AppiumTest
             }
 
             int deltaHeight = 0;
-            if (topToolbar != null) {
+            if (topToolbar != null)
+            {
                 int webViewTop = webviewRect.Y;
                 Rectangle topToolbarRect = new Rectangle(
                     topToolbar.Location.X,
@@ -320,13 +337,15 @@ namespace AppiumTest
             return nativeRect;
         }
 
-        private List<AppiumWebElement> FindElements(AppiumWebElement? rootElement, int timeoutInMiliSeconds, bool multiple, params By[] locators)
+        private List<AppiumWebElement> FindElements(AppiumWebElement? rootElement, int timeoutInMiliSeconds,
+            bool multiple, params By[] locators)
         {
             string locatorText = Utils.GetLocatorText(locators);
             Console.WriteLine($"Find element by: {locatorText}");
             string notFoundMessage = $"Cannot find element by: {locatorText}";
 
-            if (locators.Length == 1) {
+            if (locators.Length == 1)
+            {
                 SetImplicitWaitInMiliSecond(timeoutInMiliSeconds);
 
                 List<AppiumWebElement> elements = null;
@@ -347,7 +366,9 @@ namespace AppiumTest
                     return elements;
 
                 throw new Exception(notFoundMessage);
-            } else {
+            }
+            else
+            {
                 int waitInterval = 5;
 
                 return Utils.Retry((attempt) =>
@@ -366,24 +387,24 @@ namespace AppiumTest
                         }
 
                         if (multiple && elements != null && !elements.IsNullOrEmpty())
-                                return elements;
+                            return elements;
                         else if (!multiple && elements != null && elements.Count() == 1)
                             return elements;
                     }
 
                     SetImplicitWaitInMiliSecond(Config.ImplicitWaitInMs);
                     throw new Exception(notFoundMessage);
-
                 }, null, timeoutInMiliSeconds / (waitInterval * 1000), waitInterval * 1000);
             }
         }
 
 
-
-        public AppiumWebElement FindElementBy(AppiumWebElement? rootElement, int timeoutInMiliSeconds, params By[] locators)
+        public AppiumWebElement FindElementBy(AppiumWebElement? rootElement, int timeoutInMiliSeconds,
+            params By[] locators)
         {
             List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, false, locators);
-                if (foundElements == null || foundElements.Count != 1) {
+            if (foundElements == null || foundElements.Count != 1)
+            {
                 throw new Exception($"Cannot find element by: {Utils.GetLocatorText(locators)}");
             }
 
@@ -397,13 +418,15 @@ namespace AppiumTest
 
         public AppiumWebElement FindElementBy(int timeoutInMiliSeconds, params By[] locators)
         {
-                return FindElementBy(null, Math.Max(Config.ImplicitWaitInMs, timeoutInMiliSeconds), locators);
+            return FindElementBy(null, Math.Max(Config.ImplicitWaitInMs, timeoutInMiliSeconds), locators);
         }
 
-        public List<AppiumWebElement> FindElementsBy(AppiumWebElement rootElement, int timeoutInMiliSeconds, params By[] locators)
+        public List<AppiumWebElement> FindElementsBy(AppiumWebElement rootElement, int timeoutInMiliSeconds,
+            params By[] locators)
         {
             List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, true, locators);
-                if (foundElements == null || foundElements.IsNullOrEmpty()) {
+            if (foundElements == null || foundElements.IsNullOrEmpty())
+            {
                 throw new Exception($"Cannot find elements by: {Utils.GetLocatorText(locators)}");
             }
 
@@ -417,16 +440,7 @@ namespace AppiumTest
 
         public bool IsButtonElement(AppiumWebElement element)
         {
-            try
-            {
-                string tagName = element.GetAttribute("tagName");
-                return !string.IsNullOrEmpty(tagName) && tagName.Trim().ToLower() == "button";
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error when retrieving tag name: " + ex.Message);
-                return false;
-            }
+            return element.TagName.Contains("Button");
         }
 
         public AppiumWebElement FindVisibleWebElement(params By[] locators)
@@ -436,7 +450,8 @@ namespace AppiumTest
 
             List<AppiumWebElement> foundElements = FindElementsBy(locators);
             AppiumWebElement visibleElement = null;
-            foreach (AppiumWebElement element in foundElements) {
+            foreach (AppiumWebElement element in foundElements)
+            {
                 string res = (string)ExecuteScriptOnWebElement(element, "isElementVisible");
                 bool visible = "true".Equals(res);
                 if (visible)
@@ -476,9 +491,12 @@ namespace AppiumTest
          */
         public void TouchOnElementByType(AppiumWebElement element, double relativePointX, double relativePointY)
         {
-            if (IsButtonElement(element)) {
+            if (IsButtonElement(element))
+            {
                 ClickElement(element);
-            } else {
+            }
+            else
+            {
                 TouchAtRelativePointOfElement(element, relativePointX, relativePointY);
             }
         }
@@ -495,9 +513,11 @@ namespace AppiumTest
         /**
          * Touch at relative point of element (element need to be visible)
          */
-        public TouchAction TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX, double relativePointY)
+        public TouchAction TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX,
+            double relativePointY)
         {
-            Console.WriteLine($"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
+            Console.WriteLine(
+                $"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
 
             return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
         }
@@ -515,10 +535,10 @@ namespace AppiumTest
             dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
 
             var sourceElementDoc = new XmlDocument();
-            sourceElementDoc.LoadXml((string) infoObject.touchedElementSource);
+            sourceElementDoc.LoadXml((string)infoObject.touchedElementSource);
             XmlNode sourceElement = sourceElementDoc.DocumentElement;
             var screenSize = GetScreenSize();
-            string sourceElementXpath = (string) infoObject.touchedElementXpath;
+            string sourceElementXpath = (string)infoObject.touchedElementXpath;
 
             AppiumWebElement? scrollableElement = null;
             var potentialXpathList = new List<string>();
@@ -542,25 +562,31 @@ namespace AppiumTest
                             if (itemNode.NodeType != XmlNodeType.Element) continue;
 
                             var isEqual = compareNodes(sourceElement, itemNode);
-                            if (isEqual) {
+                            if (isEqual)
+                            {
                                 potentialXpathList.Add(Utils.GetXPathOfNode(itemNode));
                             }
                         }
 
-                        if (!potentialXpathList.IsNullOrEmpty()) {
-                            foreach (var xpath in potentialXpathList) {
-                                if (sourceElementXpath.Equals(xpath)) {
+                        if (!potentialXpathList.IsNullOrEmpty())
+                        {
+                            foreach (var xpath in potentialXpathList)
+                            {
+                                if (sourceElementXpath.Equals(xpath))
+                                {
                                     targetElementXpath = xpath;
                                     break;
                                 }
                             }
 
-                            if (targetElementXpath == null) {
+                            if (targetElementXpath == null)
+                            {
                                 targetElementXpath = potentialXpathList[0];
                             }
                         }
 
-                        if (targetElementXpath == null) {
+                        if (targetElementXpath == null)
+                        {
                             throw new Exception();
                         }
 
@@ -572,7 +598,7 @@ namespace AppiumTest
                     Console.WriteLine($"Cannot find touchable element, ${Utils.ConvertToOrdinal(attempt)} attempt");
                     if (scrollableElement == null)
                     {
-                        scrollableElement = FindElementBy(By.XPath((string) infoObject.scrollableElementXpath));
+                        scrollableElement = FindElementBy(By.XPath((string)infoObject.scrollableElementXpath));
                         HideKeyboard();
                     }
 
@@ -585,26 +611,28 @@ namespace AppiumTest
                         var center = Utils.GetCenterOfElement(scrollableElement);
                         var rect = scrollableElement.Rect;
                         // Fix bug when scrollableElement is out of viewport
-                        if (center.Y > screenSize.Y || rect.Height < 0) {
+                        if (center.Y > screenSize.Y || rect.Height < 0)
+                        {
                             center.Y = screenSize.Y / 2;
                         }
 
                         DragFromPoint(center, 0, -0.5);
                     }
-                    
+
                     return 0;
                 }, 10, 0);
 
-            if (touchableElement == null) {
+            if (touchableElement == null)
+            {
                 throw new Exception("Cannot find any element to touch");
             }
 
             SetCurrentCommandId(currentCommandId);
             TouchAtRelativePointOfElement(
                 touchableElement,
-                Double.Parse((string) infoObject.touchedElementRelativeX, CultureInfo.InvariantCulture),
-                Double.Parse((string) infoObject.touchedElementRelativeY, CultureInfo.InvariantCulture)
-                );
+                Double.Parse((string)infoObject.touchedElementRelativeX, CultureInfo.InvariantCulture),
+                Double.Parse((string)infoObject.touchedElementRelativeY, CultureInfo.InvariantCulture)
+            );
         }
 
         /**
@@ -662,9 +690,11 @@ namespace AppiumTest
         /**
          * Swipe from relative position to relative position (with accelerate)
          */
-        public void SwipeByPoint(double fromRelativePointX, double fromRelativePointY, double toRelativePointX, double toRelativePointY, int durationInMs)
+        public void SwipeByPoint(double fromRelativePointX, double fromRelativePointY, double toRelativePointX,
+            double toRelativePointY, int durationInMs)
         {
-            Console.Write($"Swipe from relative point ({fromRelativePointX}, {fromRelativePointY}) to relative point ({toRelativePointX}, {toRelativePointY}) with duration {durationInMs}");
+            Console.Write(
+                $"Swipe from relative point ({fromRelativePointX}, {fromRelativePointY}) to relative point ({toRelativePointX}, {toRelativePointY}) with duration {durationInMs}");
 
             Point fromPoint = GetAbsolutePoint(fromRelativePointX, fromRelativePointY);
             Point toPoint = GetAbsolutePoint(toRelativePointX, toRelativePointY);
@@ -677,16 +707,19 @@ namespace AppiumTest
          */
         public void SwipeByPoint(Point fromPoint, Point toPoint, int durationInMs)
         {
-            Console.WriteLine($"Swipe from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y}) with duration {durationInMs}");
+            Console.WriteLine(
+                $"Swipe from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y}) with duration {durationInMs}");
 
             PointerInputDevice finger = new PointerInputDevice(PointerKind.Touch, "finger");
             ActionSequence sequence = new ActionSequence(finger, 0);
-            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.FromMilliseconds(0)));
+            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y,
+                TimeSpan.FromMilliseconds(0)));
             sequence.AddAction(finger.CreatePointerDown(MouseButton.Left));
-            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y, TimeSpan.FromMilliseconds(durationInMs)));
+            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y,
+                TimeSpan.FromMilliseconds(durationInMs)));
             sequence.AddAction(finger.CreatePointerUp(MouseButton.Left));
 
-            driver.PerformActions(new List<ActionSequence> {sequence});
+            driver.PerformActions(new List<ActionSequence> { sequence });
         }
 
         /**
@@ -695,7 +728,8 @@ namespace AppiumTest
         public void SwipeToTop(Point fromPoint)
         {
             Point toPoint = new Point(fromPoint.X, GetScreenSize().Y - 10);
-            Console.WriteLine($"Swipe to top from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
+            Console.WriteLine(
+                $"Swipe to top from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
 
             SwipeByPoint(fromPoint, toPoint, 100);
         }
@@ -710,24 +744,29 @@ namespace AppiumTest
 
             if (isIos)
             {
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.FromMilliseconds(0)));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y,
+                    TimeSpan.FromMilliseconds(0)));
                 sequence.AddAction(finger.CreatePointerDown(MouseButton.Middle));
                 sequence.AddAction(finger.CreatePause(TimeSpan.FromMilliseconds(2000)));
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y, TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y,
+                    TimeSpan.FromMilliseconds(300)));
                 sequence.AddAction(finger.CreatePointerUp(MouseButton.Middle));
             }
             else
             {
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.FromMilliseconds(0)));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y,
+                    TimeSpan.FromMilliseconds(0)));
                 sequence.AddAction(finger.CreatePointerDown(MouseButton.Middle));
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y, TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y,
+                    TimeSpan.FromMilliseconds(300)));
                 sequence.AddAction(finger.CreatePause(TimeSpan.FromMilliseconds(300)));
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Pointer, 0, 0, TimeSpan.FromMilliseconds(300)));
-                sequence.AddAction(finger.CreatePointerUp( MouseButton.Middle));
+                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Pointer, 0, 0,
+                    TimeSpan.FromMilliseconds(300)));
+                sequence.AddAction(finger.CreatePointerUp(MouseButton.Middle));
             }
 
             Console.WriteLine($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
-            driver.PerformActions(new List<ActionSequence> {sequence});
+            driver.PerformActions(new List<ActionSequence> { sequence });
         }
 
         public void SendKeys(string keys)
@@ -736,35 +775,48 @@ namespace AppiumTest
 
             Console.WriteLine($"Send keys: {keys}");
 
-            if (this.isIos) {
-                var uri = new UriBuilder($"{GetAppiumServerUrl()}session/{driver.SessionId}/keys");
-                var query = new Dictionary<string, string>
+            if (isIos)
+            {
+                var chars = keys.ToCharArray();
+                var requestJson = new JObject
                 {
-                    {"value", keys}
+                    ["value"] = JArray.FromObject(chars)
                 };
-                uri.Query = new FormUrlEncodedContent(query).ReadAsStringAsync().Result;
-                var request = new HttpRequestMessage{
-                    Method = HttpMethod.Post,
-                    RequestUri = uri.Uri,
-                    Headers = {
-                        {
-                            HttpRequestHeader.Authorization.ToString(), Config.GetBasicAuthString()
-                        }
-                    }
-                };
-                httpClient.SendAsync(request).Wait();
-           } else
-           {
-                Actions action = new Actions(driver);
 
-                foreach (char c in keys)
+                StringContent requestBody =
+                    new StringContent(requestJson.ToString(), Encoding.UTF8, "application/json");
+
+                var sendKeysRequest = new HttpRequestMessage(HttpMethod.Post,
+                    $"{GetAppiumServerUrl()}/session/{driver.SessionId}/keys")
                 {
-                    string key = c.ToString();
-                    action.SendKeys(key);
+                    Content = requestBody
+                };
+
+                var response = httpClient.SendAsync(sendKeysRequest).Result;
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception(response.Content.ReadAsStringAsync().Result);
                 }
+            }
+            else
+            {
+                try
+                {
+                    KeyInputDevice keyInput = new KeyInputDevice("keyboard");
+                    ActionSequence sequence = new ActionSequence(keyInput, 0);
+                    for (int index = 0; index < keys.Length; index++)
+                    {
+                        var charAt = keys[index];
+                        sequence.AddAction(keyInput.CreateKeyDown(charAt));
+                        sequence.AddAction(keyInput.CreateKeyUp(charAt));
+                    }
 
-                action.Perform();
-                sleep(SleepAfterAction);
+                    driver.PerformActions(new List<ActionSequence> { sequence });
+                }
+                catch (Exception ignored)
+                {
+                    GetAndroidDriver().Keyboard.SendKeys(keys);
+                }
             }
         }
 
@@ -778,7 +830,8 @@ namespace AppiumTest
         public void ClearTextField(int maxChars)
         {
             Console.WriteLine($"Clear text field, maximum {maxChars} characters");
-            for (int i = 0; i < maxChars; i++) {
+            for (int i = 0; i < maxChars; i++)
+            {
                 Press(PressTypes.Delete);
             }
         }
@@ -787,78 +840,87 @@ namespace AppiumTest
         {
             Console.WriteLine($"Press on {type} key");
 
-            switch (type) {
+            switch (type)
+            {
                 case PressTypes.Home:
-                if (isIos)
-                {
-                    IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
-                    if (iosDriver.IsLocked())
+                    if (isIos)
                     {
-                        iosDriver.Unlock();
+                        IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
+                        if (iosDriver.IsLocked())
+                        {
+                            iosDriver.Unlock();
+                        }
+                        else
+                        {
+                            var scriptArgs = new Dictionary<string, object>
+                            {
+                                { "name", "home" }
+                            };
+
+                            driver.ExecuteScript("mobile: pressButton", scriptArgs);
+                        }
                     }
                     else
                     {
-                            driver.ExecuteScript("mobile: pressButton");//, ImmutableMap.of("name", "home"));
+                        PressAndroidKey(AndroidKeyCode.Home);
                     }
-                }
-                else
-                {
-                    PressAndroidKey(AndroidKeyCode.Home);
-                }
-                break;
 
-            case PressTypes.Back:
-                PressAndroidKey(AndroidKeyCode.Back);
-                break;
+                    break;
 
-            case PressTypes.Power:
-                if (isIos)
-                {
-                    IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
-                    if (iosDriver.IsLocked())
+                case PressTypes.Back:
+                    PressAndroidKey(AndroidKeyCode.Back);
+                    break;
+
+                case PressTypes.Power:
+                    if (isIos)
                     {
-                        iosDriver.Lock();
+                        IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
+                        if (iosDriver.IsLocked())
+                        {
+                            iosDriver.Unlock();
+                        }
+                        else
+                        {
+                            iosDriver.Lock();
+                        }
                     }
                     else
                     {
-                        iosDriver.Lock();
+                        PressAndroidKey(AndroidKeyCode.Keycode_POWER);
                     }
-                }
-                else
-                {
-                    PressAndroidKey(AndroidKeyCode.Keycode_POWER);
-                }
-                break;
 
-            case PressTypes.AppSwitch:
-                PressAndroidKey(AndroidKeyCode.Keycode_APP_SWITCH);
-                break;
+                    break;
 
-            case PressTypes.Enter:
-                if (isIos)
-                {
-                    SendKeys("\n");
-                }
-                else
-                {
-                    PressAndroidKey(AndroidKeyCode.Enter);
-                }
-                break;
+                case PressTypes.AppSwitch:
+                    PressAndroidKey(AndroidKeyCode.Keycode_APP_SWITCH);
+                    break;
 
-            case PressTypes.Delete:
-                if (isIos)
-                {
-                    SendKeys("\b");
-                }
-                else
-                {
-                    PressAndroidKey(AndroidKeyCode.Del);
-                }
-                break;
+                case PressTypes.Enter:
+                    if (isIos)
+                    {
+                        SendKeys("\n");
+                    }
+                    else
+                    {
+                        PressAndroidKey(AndroidKeyCode.Enter);
+                    }
 
-            default:
-                throw new Exception($"Don't support press {type} key");
+                    break;
 
+                case PressTypes.Delete:
+                    if (isIos)
+                    {
+                        SendKeys("\b");
+                    }
+                    else
+                    {
+                        PressAndroidKey(AndroidKeyCode.Del);
+                    }
+
+                    break;
+
+                default:
+                    throw new Exception($"Don't support press {type} key");
             }
         }
 
@@ -913,13 +975,14 @@ namespace AppiumTest
 
         public Point GetScreenSize()
         {
-            if (screenSize == null) {
+            if (screenSize == null)
+            {
                 byte[] screenshotBytes = ((ITakesScreenshot)driver).GetScreenshot().AsByteArray;
                 var image = SkiaSharp.SKBitmap.Decode(new MemoryStream(screenshotBytes));
                 screenSize = new Point(image.Width, image.Height);
             }
 
-            return (Point) screenSize;
+            return (Point)screenSize;
         }
 
         public Point GetAppOffset()
@@ -928,7 +991,8 @@ namespace AppiumTest
 
             try
             {
-                AppiumWebElement rootElement = driver.FindElement(By.XPath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
+                AppiumWebElement rootElement =
+                    driver.FindElement(By.XPath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
                 Size rootElementSize = rootElement.Size;
                 Point screenSize = GetScreenSize();
                 double screenWidthScaled = screenSize.X / retinaScale;
@@ -958,10 +1022,15 @@ namespace AppiumTest
         {
             Point screenSize = GetScreenSize();
 
-            if (retinaScale > 1) {
-                return new Point((int)Math.Round(relativePointX * screenSize.X / retinaScale), (int)Math.Round(relativePointY * screenSize.Y / retinaScale));
-            } else {
-                return new Point((int)Math.Round(relativePointX * screenSize.X), (int)Math.Round(relativePointY * screenSize.Y));
+            if (retinaScale > 1)
+            {
+                return new Point((int)Math.Round(relativePointX * screenSize.X / retinaScale),
+                    (int)Math.Round(relativePointY * screenSize.Y / retinaScale));
+            }
+            else
+            {
+                return new Point((int)Math.Round(relativePointX * screenSize.X),
+                    (int)Math.Round(relativePointY * screenSize.Y));
             }
         }
 
@@ -985,9 +1054,13 @@ namespace AppiumTest
 
             if (!expected.Name.Equals(actual.Name)) return false;
 
-            var compareAttrs = new string[] { "label", "text", "visible", "class", "name", "type", "resource-id", "content-desc", "accessibility-id" };
+            var compareAttrs = new string[]
+            {
+                "label", "text", "visible", "class", "name", "type", "resource-id", "content-desc", "accessibility-id"
+            };
 
-            foreach (var attrName in compareAttrs) {
+            foreach (var attrName in compareAttrs)
+            {
                 string v1 = null;
                 string v2 = null;
                 try
@@ -1033,7 +1106,8 @@ namespace AppiumTest
 
         public Uri GetAppiumServerUrl()
         {
-            if (proxy != null) {
+            if (proxy != null)
+            {
                 return new Uri(this.proxy.GetServerUrl());
             }
             else
@@ -1119,16 +1193,26 @@ namespace AppiumTest
             {
                 { "isOnline", "true" },
                 { "isBooked", "false" },
-                { "deviceName", capabilities.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName).ToString() },
-                { "platformVersion", capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion).ToString() },
-                { "platformName", capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformName).ToString() },
+                {
+                    "deviceName",
+                    capabilities.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName).ToString()
+                },
+                {
+                    "platformVersion",
+                    capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion).ToString()
+                },
+                {
+                    "platformName",
+                    capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformName).ToString()
+                },
                 { "deviceGroup", capabilities.ToCapabilities().GetCapability("deviceGroup").ToString() }
             };
             deviceListUriBuilder.Query = new FormUrlEncodedContent(query).ReadAsStringAsync().Result;
 
             using (var httpClient = new HttpClient())
             {
-                httpClient.DefaultRequestHeaders.Add(HttpRequestHeader.Authorization.ToString(), Config.GetBasicAuthString());
+                httpClient.DefaultRequestHeaders.Add(HttpRequestHeader.Authorization.ToString(),
+                    Config.GetBasicAuthString());
 
                 var response = await httpClient.GetAsync(deviceListUriBuilder.Uri);
 
@@ -1156,31 +1240,41 @@ namespace AppiumTest
 
         public Device FindOnlineDevice(AppiumOptions capabilities)
         {
-            if (Config.DeviceSource != Config.DeviceSourceEnums.Kobiton) {
+            if (Config.DeviceSource != Config.DeviceSourceEnums.Kobiton)
+            {
                 return null;
             }
 
             int tryTime = 1;
             Device device = null;
-            string deviceName = (string) capabilities.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName);
-            string deviceGroup = (string) capabilities.ToCapabilities().GetCapability("deviceGroup");
-            string platformVersion = (string) capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion);
-            string platformName = (string) capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformName);
-            while (tryTime <= Config.DeviceWaitingMaxTryTimes) {
-                Console.WriteLine($"Is device with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion}) online? Retrying at {Utils.ConvertToOrdinal(tryTime)} time");
+            string deviceName = (string)capabilities.ToCapabilities().GetCapability(MobileCapabilityType.DeviceName);
+            string deviceGroup = (string)capabilities.ToCapabilities().GetCapability("deviceGroup");
+            string platformVersion =
+                (string)capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion);
+            string platformName =
+                (string)capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformName);
+            while (tryTime <= Config.DeviceWaitingMaxTryTimes)
+            {
+                Console.WriteLine(
+                    $"Is device with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion}) online? Retrying at {Utils.ConvertToOrdinal(tryTime)} time");
                 device = GetAvailableDevice(capabilities).Result;
                 if (device != null)
                 {
-                    Console.WriteLine($"Device is found with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion})");
+                    Console.WriteLine(
+                        $"Device is found with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion})");
                     break;
                 }
+
                 tryTime++;
                 sleep(Config.DeviceWaitingInternalInMs);
             }
 
-            if (device == null) {
-                throw new Exception($"Cannot find any online devices with capabilites: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion})");
+            if (device == null)
+            {
+                throw new Exception(
+                    $"Cannot find any online devices with capabilites: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion})");
             }
+
             return device;
         }
 
