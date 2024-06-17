@@ -1,6 +1,9 @@
 {
   "name": "appium-script-generator",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "src/index.js",
   "repository": "git@github.com:kobiton/appium-script-generator.git",
   "author": "Kobiton Inc.",
