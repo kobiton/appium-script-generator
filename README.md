@@ -4,7 +4,7 @@ The Appium Script Generator will launch a gRPC server, which generates an Appium
 
 ## Requirements
 
-- Node.js v14.16.1. (output of `node -v` command)
+- Node.js v20.x (output of `node -v` command)
 - Yarn v1.22.4. (output of `yarn -v` command)
 
 ## Commands
