@@ -787,7 +787,7 @@ namespace AppiumTest
                     new StringContent(requestJson.ToString(), Encoding.UTF8, "application/json");
 
                 var sendKeysRequest = new HttpRequestMessage(HttpMethod.Post,
-                    $"{GetAppiumServerUrl()}/session/{driver.SessionId}/keys")
+                    $"{GetAppiumServerUrl()}session/{driver.SessionId}/keys")
                 {
                     Content = requestBody
                 };
