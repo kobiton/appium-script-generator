@@ -11,6 +11,7 @@ namespace AppiumTest
         private bool forceW3C = false;
         private HttpListener listener;
         private int listeningPort = 0;
+        private Uri appiumServerUri = new Uri(Config.AppiumServerUrl);
 
         public int CurrentCommandId
         {
@@ -69,21 +70,28 @@ namespace AppiumTest
                     Content = new StreamContent(request.InputStream)
                 };
 
-                httpRequest.Content.Headers.Add("Content-Type", "application/json");
-                httpRequest.Headers.Add("Accept", "application/json");
+                foreach (string header in context.Request.Headers)
+                {
+                    if (!httpRequest.Headers.TryAddWithoutValidation(header, context.Request.Headers[header]))
+                    {
+                        httpRequest.Content?.Headers.TryAddWithoutValidation(header, context.Request.Headers[header]);
+                    }
+                }
+
                 httpRequest.Headers.Add("Authorization", Config.GetBasicAuthString());
+                httpRequest.Headers.Host = $"{appiumServerUri.Host}:{appiumServerUri.Port}";
 
                 var response = client.SendAsync(httpRequest).Result;
                 var statusCode = (int)response.StatusCode;
                 var responseData = response.Content.ReadAsByteArrayAsync().Result;
                 var responseString = System.Text.Encoding.UTF8.GetString(responseData);
-                
+
                 var jsonResponse = JObject.Parse(responseString);
                 if ("/session".Equals(request.Url.LocalPath, StringComparison.OrdinalIgnoreCase) && request.HttpMethod == "POST" && Utils.IsStatusCodeSuccess(statusCode))
                 {
                     // Extract the kobitonSessionId
                     kobitonSessionId = jsonResponse["value"]["kobitonSessionId"].Value<long>();
-                    
+
                     // Convert response body to W3C format if needed
                     if (jsonResponse["status"] != null && jsonResponse["sessionId"] != null)
                     {
@@ -107,7 +115,7 @@ namespace AppiumTest
                 if (!Utils.IsStatusCodeSuccess(statusCode) && forceW3C)
                 {
                     int appiumErrorCode = jsonResponse["status"].Value<int>();
-                    
+
                     string error;
 
                     switch (appiumErrorCode)
@@ -126,12 +134,18 @@ namespace AppiumTest
                     jsonResponse["value"]["error"] = error;
                     responseString = jsonResponse.ToString();
                 }
-                
+
                 context.Response.StatusCode = statusCode;
-                
-                string contentType = response.Content.Headers.ContentType?.MediaType;
-                context.Response.ContentType = contentType;
-                
+                context.Response.ContentType = "application/json";
+                foreach (var header in response.Headers)
+                {
+                    context.Response.Headers[header.Key] = string.Join(",", header.Value);
+                }
+                foreach (var header in response.Content.Headers)
+                {
+                    context.Response.Headers[header.Key] = string.Join(",", header.Value);
+                }
+
                 byte[] modifiedResponseData = System.Text.Encoding.UTF8.GetBytes(responseString);
                 context.Response.ContentLength64 = modifiedResponseData.Length;
                 context.Response.OutputStream.Write(modifiedResponseData, 0, modifiedResponseData.Length);
