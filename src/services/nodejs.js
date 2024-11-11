@@ -343,8 +343,13 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
         } break
 
         case 'press': {
-          const {value} = action
-          lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+          const {value, count = 1} = action
+          if (count === 1) {
+            lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+          }
+          else {
+            lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+          }
         } break
 
         case 'sendKeys': {

@@ -364,8 +364,14 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
         } break
 
         case 'press': {
-          const {value} = action
-          lines.push(new Line(`Press(PressTypes.${upperFirst(camelCase(value))});`))
+          const {value, count = 1} = action
+          if (count === 1) {
+            lines.push(new Line(`Press(PressTypes.${upperFirst(camelCase(value))});`))
+          }
+          else {
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`PressMultiple(PressTypes.${upperFirst(camelCase(value))}, ${count});`))
+          }
         } break
 
         case 'sendKeys': {
