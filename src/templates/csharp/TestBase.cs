@@ -830,10 +830,7 @@ namespace AppiumTest
         public void ClearTextField(int maxChars)
         {
             Console.WriteLine($"Clear text field, maximum {maxChars} characters");
-            for (int i = 0; i < maxChars; i++)
-            {
-                Press(PressTypes.Delete);
-            }
+            PressMultiple(PressTypes.Delete, maxChars);
         }
 
         public void Press(PressTypes type)
@@ -908,19 +905,29 @@ namespace AppiumTest
                     break;
 
                 case PressTypes.Delete:
-                    if (isIos)
-                    {
-                        SendKeys("\b");
-                    }
-                    else
-                    {
-                        PressAndroidKey(AndroidKeyCode.Del);
-                    }
-
+                    SendKeys("\b");
                     break;
 
                 default:
                     throw new Exception($"Don't support press {type} key");
+            }
+        }
+
+        public void PressMultiple(PressTypes type, int count)
+        {
+            Console.WriteLine($"Press on {type} key {count} times");
+
+            switch (type)
+            {
+                case PressTypes.Delete:
+                    SendKeys(new string('\b', count));
+                    break;
+                default:
+                    for (int i = 0; i < count; i++)
+                    {
+                        Press(type);
+                    }
+                    break;
             }
         }
 

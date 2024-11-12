@@ -636,9 +636,7 @@ public class TestBase {
 
     public void clearTextField(int maxChars) throws Exception {
         System.out.println(String.format("Clear text field, maximum %d characters", maxChars));
-        for (int i = 0; i < maxChars; i++) {
-            press(PRESS_TYPES.DELETE);
-        }
+        pressMultiple(PRESS_TYPES.DELETE, maxChars);
     }
 
     public void press(PRESS_TYPES type) throws Exception {
@@ -688,16 +686,25 @@ public class TestBase {
                 break;
 
             case DELETE:
-                if (isIos) {
-                    sendKeys("\b");
-                } else {
-                    pressAndroidKey(AndroidKey.DEL);
-                }
+                sendKeys("\b");
                 break;
 
             default:
                 throw new Exception(String.format("Don't support press %s key", type));
 
+        }
+    }
+
+    public void pressMultiple(PRESS_TYPES type, int count) throws Exception {
+        System.out.println(String.format("Press on %s key %s times", type, count));
+        switch (type) {
+            case DELETE:
+                sendKeys(new String(new char[count]).replace("\0", "\b"));
+                break;
+            default:
+                for (int i = 0; i < count; i++) {
+                    press(type);
+                }
         }
     }
 

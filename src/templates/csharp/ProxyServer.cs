@@ -25,16 +25,14 @@ namespace AppiumTest
 
             try {
                 listener.Start();
-                Console.WriteLine($"Proxy server started at {GetServerUrl()}");
-
-                while(true){
+                while (listener.IsListening) {
                     var context = await listener.GetContextAsync();
                     await Task.Run(() => HandleRequest(context, Config.AppiumServerUrl));
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error: " + ex.Message);
+                Console.WriteLine("Error: " + ex);
             }
         }
 
@@ -159,8 +157,8 @@ namespace AppiumTest
         {
             if (listener != null && listener.IsListening)
             {
+                listener.Stop();
                 listener.Close();
-                Console.WriteLine("Proxy server stopped");
             }
         }
 

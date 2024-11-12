@@ -383,8 +383,13 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
         } break
 
         case 'press': {
-          const {value} = action
-          lines.push(new Line(`press(PRESS_TYPES.${value});`))
+          const {value, count = 1} = action
+          if (count === 1) {
+            lines.push(new Line(`press(PRESS_TYPES.${value});`))
+          }
+          else {
+            lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+          }
         } break
 
         case 'sendKeys': {

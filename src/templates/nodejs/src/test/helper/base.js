@@ -495,10 +495,7 @@ export default class TestBase {
 
   async clearTextField(maxChars) {
     console.log(`Clear text field, maximum ${maxChars} characters`)
-
-    for (let i = 0; i < maxChars; i++) {
-      await this.press(PRESS_TYPES.DELETE)
-    }
+    await this.pressMultiple(PRESS_TYPES.DELETE, maxChars)
   }
 
   async press(type) {
@@ -537,11 +534,11 @@ export default class TestBase {
         break
 
       case PRESS_TYPES.ENTER:
-        this._isIos ? await this._driver.keys('\n') : await this._driver.pressKeycode('66')
+        this._isIos ? await this.sendKeys('\n') : await this._driver.pressKeycode('66')
         break
 
       case PRESS_TYPES.DELETE:
-        this._isIos ? await this._driver.keys('\b') : await this._driver.pressKeycode('67')
+        await this.sendKeys('\b')
         break
 
       default:
@@ -549,6 +546,20 @@ export default class TestBase {
     }
 
     await this.sleep(SLEEP_AFTER_ACTION)
+  }
+
+  async pressMultiple(type, count) {
+    console.log(`Press on ${type} key ${count} times`)
+    switch (type) {
+      case PRESS_TYPES.DELETE:
+        await this.sendKeys('\b'.repeat(count))
+        break
+
+      default:
+        for (let i = 0; i < count; ++i) {
+          await this.press(type)
+        }
+    }
   }
 
   async hideKeyboard() {
