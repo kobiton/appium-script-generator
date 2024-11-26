@@ -423,7 +423,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
         case 'setLocation': {
           const {lat, long} = action
           // eslint-disable-next-line max-len
-          lines.push(new Line(`driver.setLocation(new Location((long)Double.parseDouble("${lat}"), (long)Double.parseDouble("${long}"), 0.0));`))
+          lines.push(new Line(`driver.Location = new Location {Latitude = ${lat}, Longitude = ${long}, Altitude = 0};`))
         } break
 
         case 'generateRandomPhoneNumber': {
