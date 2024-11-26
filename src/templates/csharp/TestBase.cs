@@ -377,19 +377,25 @@ namespace AppiumTest
                     List<AppiumWebElement> elements = null;
                     foreach (By locator in locators)
                     {
-                        if (rootElement == null)
+                        try
                         {
-                            elements = driver.FindElements(locators[0]).ToList();
-                        }
-                        else
-                        {
-                            elements = rootElement.FindElements(locators[0]).ToList();
-                        }
+                            if (rootElement == null)
+                            {
+                                elements = driver.FindElements(locator).ToList();
+                            }
+                            else
+                            {
+                                elements = rootElement.FindElements(locator).ToList();
+                            }
 
-                        if (multiple && elements != null && !elements.IsNullOrEmpty())
-                            return elements;
-                        else if (!multiple && elements != null && elements.Count() == 1)
-                            return elements;
+                            if (multiple && elements != null && !elements.IsNullOrEmpty())
+                                return elements;
+                            else if (!multiple && elements != null && elements.Count() == 1)
+                                return elements;
+                        }
+                        catch (Exception ignored)
+                        {
+                        }
                     }
 
                     SetImplicitWaitInMiliSecond(Config.ImplicitWaitInMs);
@@ -397,7 +403,6 @@ namespace AppiumTest
                 }, null, timeoutInMiliSeconds / (waitInterval * 1000), waitInterval * 1000);
             }
         }
-
 
         public AppiumWebElement FindElementBy(AppiumWebElement? rootElement, int timeoutInMiliSeconds,
             params By[] locators)

@@ -400,7 +400,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
         case 'setLocation': {
           const {lat, long} = action
           // eslint-disable-next-line max-len
-          lines.push(new Line(`await this.driver.setLocation(new Location(${lat}, ${long}), 0.0))`))
+          lines.push(new Line(`this._driver.setGeoLocation({latitude: ${lat}, longitude: ${long}, altitude: 0})`))
         } break
 
         case 'generateRandomPhoneNumber': {
