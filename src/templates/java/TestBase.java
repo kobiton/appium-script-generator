@@ -24,11 +24,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.utils.URIBuilder;
-import org.dom4j.Document;
-import org.dom4j.DocumentHelper;
-import org.dom4j.Element;
-import org.dom4j.Node;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
+import org.jsoup.select.Elements;
 import org.openqa.selenium.*;
 import org.openqa.selenium.interactions.KeyInput;
 import org.openqa.selenium.interactions.Pause;
@@ -71,7 +71,7 @@ public class TestBase {
         this.desiredCaps = desiredCaps;
         this.retinaScale = retinaScale;
         this.isIos = MobilePlatform.IOS.equalsIgnoreCase(
-            (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_NAME));
+                (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_NAME));
         this.deviceName = (String) desiredCaps.getCapability(MobileCapabilityType.DEVICE_NAME);
         this.platformVersion = (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_VERSION);
 
@@ -118,116 +118,102 @@ public class TestBase {
     }
 
     public String switchToWebContext() throws Exception {
-        for (int tryTime = 1; tryTime <= 3; tryTime++) {
-            System.out.println(String.format("Find a web context, %s time", Utils.convertToOrdinal(tryTime)));
-            List<ContextInfo> contextInfos = new ArrayList<>();
+        System.out.println("Finding a web context");
+        List<ContextInfo> contextInfos = new ArrayList<>();
 
-            switchToNativeContext();
-            Document nativeDocument = loadXMLFromString(driver.getPageSource());
-            String textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
-            List<String> nativeTexts = new ArrayList<>();
-            for (Node textNode : nativeDocument.selectNodes(textNodeSelector)) {
-                if (textNode.getNodeType() != Node.ELEMENT_NODE) continue;
-                String textAttr = ((Element) textNode).attributeValue(isIos ? "value" : "text");
-                if (textAttr == null) textAttr = "";
-                textAttr = textAttr.trim().toLowerCase();
-                if (!textAttr.isEmpty()) nativeTexts.add(textAttr);
-            }
+        switchToNativeContext();
+        Document nativeDocument = loadXMLFromString(driver.getPageSource());
+        String textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
+        List<String> nativeTexts = new ArrayList<>();
+        for (Element textElement : nativeDocument.selectXpath(textNodeSelector)) {
+            String textAttr = textElement.attr(isIos ? "value" : "text");
+            textAttr = textAttr.trim().toLowerCase();
+            if (!textAttr.isEmpty()) nativeTexts.add(textAttr);
+        }
 
-            Set<String> contexts = driver.getContextHandles();
-            for (String context : contexts) {
-                if (context.startsWith("WEBVIEW") || context.equals("CHROMIUM")) {
-                    String source = null;
-                    try {
-                        switchContext(context);
-                        source = driver.getPageSource();
-                    }
-                    catch (Exception ex) {
-                        System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
-                        continue;
-                    }
-
-                    if (source == null) continue;
-                    ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
-                    if (contextInfo == null) {
-                        contextInfo = new ContextInfo(context);
-                        contextInfos.add(contextInfo);
-                    }
-
-                    contextInfo.sourceLength = source.length();
-                    if (nativeTexts.isEmpty()) continue;
-
-                    org.jsoup.nodes.Document htmlDoc = Jsoup.parse(source);
-                    String bodyString = htmlDoc.select("body").text().toLowerCase();
-                    long matchTexts = 0;
-                    for (String nativeText : nativeTexts) {
-                        if (bodyString.contains(nativeText)) matchTexts++;
-                    }
-
-                    contextInfo.matchTexts = matchTexts;
-                    contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.size();
-                    if (contextInfo.matchTextsPercent >= 80) {
-                        break;
-                    }
+        Set<String> contexts = driver.getContextHandles();
+        for (String context : contexts) {
+            if (context.startsWith("WEBVIEW") || context.equals("CHROMIUM")) {
+                String source = null;
+                try {
+                    switchContext(context);
+                    source = driver.getPageSource();
                 }
-            }
-
-            if (!contextInfos.isEmpty()) {
-                String bestWebContext;
-                contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
-                if (contextInfos.get(0).matchTextsPercent > 40) {
-                    bestWebContext = contextInfos.get(0).context;
-                } else {
-                    contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
-                    bestWebContext = contextInfos.get(0).context;
+                catch (Exception ex) {
+                    System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
+                    continue;
                 }
 
-                switchContext(bestWebContext);
-                setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
-                System.out.println(String.format("Switched to %s web context successfully", bestWebContext));
-                return bestWebContext;
+                if (source == null) continue;
+                ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
+                if (contextInfo == null) {
+                    contextInfo = new ContextInfo(context);
+                    contextInfos.add(contextInfo);
+                }
+
+                contextInfo.sourceLength = source.length();
+                if (nativeTexts.isEmpty()) continue;
+
+                Document htmlDoc = loadXMLFromString(source);
+                String bodyString = htmlDoc.select("body").text().toLowerCase();
+                long matchTexts = 0;
+                for (String nativeText : nativeTexts) {
+                    if (bodyString.contains(nativeText)) matchTexts++;
+                }
+
+                contextInfo.matchTexts = matchTexts;
+                contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.size();
+                if (contextInfo.matchTextsPercent >= 80) {
+                    break;
+                }
+            }
+        }
+
+        if (!contextInfos.isEmpty()) {
+            String bestWebContext;
+            contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
+            if (contextInfos.get(0).matchTextsPercent > 40) {
+                bestWebContext = contextInfos.get(0).context;
+            } else {
+                contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
+                bestWebContext = contextInfos.get(0).context;
             }
 
-            sleep(10000);
+            switchContext(bestWebContext);
+            setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
+            System.out.println(String.format("Switched to %s web context successfully", bestWebContext));
+            return bestWebContext;
         }
 
         throw new Exception("Cannot find any web context");
     }
 
-    public Rectangle findWebElementRect(boolean isOnKeyboard, By... locatorVarName) throws Exception {
-        System.out.println(String.format("Finding webview element rectangle with locator %s", locatorVarName));
-
-        MobileElement elementVarName = null;
-        try {
-            if (!isOnKeyboard) {
-                hideKeyboard();
+    public Rectangle findWebElementRect(By... locators) throws Exception {
+        MobileElement foundElement = Utils.retry(new Utils.Task<MobileElement>() {
+            @Override
+            MobileElement exec(int attempt) throws Exception {
+                System.out.println(String.format("Finding web element rectangle attempt %s with locator: %s", Utils.convertToOrdinal(attempt), Utils.getLocatorText(locators)));
+                switchToWebContext();
+                return findVisibleWebElement(locators);
             }
+        }, 3, 3000);
 
-            // Sometimes, the webview context is not switched successfully. So we need to retry and do more times.
-            int maxTryTimes = 5;
-            int waitIntervalInMs = 3000;
-            Utils.retry(new Utils.Task<String>() {
-                @Override
-                String exec(int attempt) throws Exception {
-                    return switchToWebContext();
-                }
-            },  maxTryTimes, waitIntervalInMs);
+        scrollToWebElement(foundElement);
+        Rectangle webRectVarName = getWebElementRect(foundElement);
+        switchToNativeContext();
+        return calculateNativeRect(webRectVarName);
+    }
 
-            elementVarName = findVisibleWebElement(locatorVarName);
-            scrollToWebElement(elementVarName);
-        }
-        catch (Exception e) {
-            throw new Exception("Cannot find webview element, error: " + e.getMessage());
-        }
+    public Rectangle findWebElementRectOnScrollable(By... locators) throws Exception {
+        System.out.println(String.format("Finding web element rectangle on scrollable with locator: %s", Utils.getLocatorText(locators)));
 
-        try {
-            Rectangle webRectVarName = getWebElementRect(elementVarName);
-            switchToNativeContext();
-            return calculateNativeRect(webRectVarName);
-        }
-        catch (Exception e) {
-            throw new Exception("Cannot calculate native rect for webview element, error: " + e.getMessage());
-        }
+        switchToWebContext();
+        MobileElement foundElement = findElementOnScrollable(locators);
+
+        scrollToWebElement(foundElement);
+        Rectangle webRectVarName = getWebElementRect(foundElement);
+        switchToNativeContext();
+        return calculateNativeRect(webRectVarName);
     }
 
     public Object executeScriptOnWebElement(MobileElement element, String command) throws Exception {
@@ -244,10 +230,10 @@ public class TestBase {
         String resultString = (String) executeScriptOnWebElement(element, "getBoundingClientRect");
         JsonObject resultJson = gson.fromJson(resultString, JsonObject.class);
         Rectangle rect = new Rectangle(
-            (int) (resultJson.get("x").getAsLong() / retinaScale),
-            (int) (resultJson.get("y").getAsLong() / retinaScale),
-            (int) (resultJson.get("height").getAsLong() / retinaScale),
-            (int) (resultJson.get("width").getAsLong() / retinaScale)
+                (int) (resultJson.get("x").getAsLong() / retinaScale),
+                (int) (resultJson.get("y").getAsLong() / retinaScale),
+                (int) (resultJson.get("height").getAsLong() / retinaScale),
+                (int) (resultJson.get("width").getAsLong() / retinaScale)
         );
 
         return rect;
@@ -263,24 +249,24 @@ public class TestBase {
             }
             catch (Exception ignored) {
                 Document nativeDocument = loadXMLFromString(driver.getPageSource());
-                Node webviewNode = nativeDocument.selectSingleNode("//XCUIElementTypeWebView");
-                Element curElement = webviewNode.getParent();
+                Element webviewElement = nativeDocument.selectXpath("//XCUIElementTypeWebView").first();
+                Element curElement = webviewElement.parent();
                 while (curElement != null) {
-                    Element firstChildElement = (Element) curElement.selectSingleNode(curElement.getUniquePath() + "/*");
+                    Element firstChildElement = curElement.child(0);
                     Rectangle firstChildRect = new Rectangle(
-                        Integer.parseInt(firstChildElement.attributeValue("x")),
-                        Integer.parseInt(firstChildElement.attributeValue("y")),
-                        Integer.parseInt(firstChildElement.attributeValue("height")),
-                        Integer.parseInt(firstChildElement.attributeValue("width"))
+                            Integer.parseInt(firstChildElement.attr("x")),
+                            Integer.parseInt(firstChildElement.attr("y")),
+                            Integer.parseInt(firstChildElement.attr("height")),
+                            Integer.parseInt(firstChildElement.attr("width"))
                     );
 
                     if (!webviewRect.equals(firstChildRect) && Utils.isRectangleInclude(webviewRect, firstChildRect)) {
-                        String topToolbarXpath = firstChildElement.getUniquePath().replace(IOS_XPATH_REDUNDANT_PREFIX, "");
+                        String topToolbarXpath = Utils.getXPath(firstChildElement).replace(IOS_XPATH_REDUNDANT_PREFIX, "");
                         topToolbar = findElementBy(By.xpath(topToolbarXpath));
                         break;
                     }
 
-                    curElement = curElement.getParent();
+                    curElement = curElement.parent();
                 }
             }
         }
@@ -294,17 +280,19 @@ public class TestBase {
         }
 
         webviewRect = new Rectangle(
-            webviewRect.x,
-            webViewTop,
-            webviewRect.height - deltaHeight,
-            webviewRect.width
+                webviewRect.x,
+                webViewTop,
+                webviewRect.height - deltaHeight,
+                webviewRect.width
         );
 
         Rectangle nativeRect = new Rectangle(
-            webviewRect.x + webElementRect.x,
-            webviewRect.y + webElementRect.y,
-            webElementRect.height,
-            webElementRect.width);
+                webviewRect.x + webElementRect.x,
+                webviewRect.y + webElementRect.y,
+                webElementRect.height,
+                webElementRect.width);
+
+        cropRect(nativeRect, webviewRect);
         return nativeRect;
     }
 
@@ -391,6 +379,112 @@ public class TestBase {
         return findElementsBy(null, Config.IMPLICIT_WAIT_IN_MS, locators);
     }
 
+    /**
+     * Scroll to find best element on scrollable
+     */
+    public MobileElement findElementOnScrollable(By... locators) throws Exception {
+        Type type = new TypeToken<Map<String, String>>() {
+        }.getType();
+        JsonReader reader = new JsonReader(new InputStreamReader(getResourceAsStream(getCurrentCommandId() + ".json")));
+        Map<String, String> infoMap = gson.fromJson(reader, type);
+
+        Document sourceElementDoc = loadXMLFromString(infoMap.get("touchedElementSource"));
+        Element sourceElement = sourceElementDoc.child(0);
+        Point screenSize = getScreenSize();
+        String sourceElementXpath = infoMap.get("touchedElementXpath");
+
+        MobileElement touchableElement = Utils.retry(new Utils.Task<MobileElement>() {
+            private MobileElement scrollableElement;
+            private List<String> potentialXpathList = new ArrayList<>();
+            private String targetElementXpath;
+
+            @Override
+            MobileElement exec(int attempt) throws Exception {
+
+                try {
+                    MobileElement foundElement = findElementBy(locators);
+                    Rectangle rect = foundElement.getRect();
+                    if (rect.x < 0 || rect.y < 0) {
+                        throw new Exception("Element is found but is not visible");
+                    }
+
+                    return foundElement;
+                } catch (Exception e) {
+                    // Might switch to the wrong web context on the first attempt; retry before scrolling down
+                    if (!"NATIVE".equals(currentContext) && attempt == 1) {
+                        throw new Exception();
+                    }
+
+                    potentialXpathList.clear();
+                    Document source = loadXMLFromString(driver.getPageSource());
+                    Elements elementsByTagName = source.selectXpath("//" + sourceElement.tagName());
+                    for (Element element : elementsByTagName) {
+                        boolean isEqual = compareNodes(sourceElement, element);
+                        if (isEqual) {
+                            potentialXpathList.add(Utils.getXPath(element));
+                        }
+                    }
+
+                    if (!potentialXpathList.isEmpty()) {
+                        for (String xpath : potentialXpathList) {
+                            if (sourceElementXpath.toLowerCase().equals(xpath.toLowerCase())) {
+                                targetElementXpath = xpath;
+                                break;
+                            }
+                        }
+
+                        if (targetElementXpath == null) {
+                            targetElementXpath = potentialXpathList.get(0);
+                        }
+                    }
+
+                    if (targetElementXpath == null) {
+                        throw new Exception();
+                    }
+
+                    return findElementBy(By.xpath(targetElementXpath.replace(IOS_XPATH_REDUNDANT_PREFIX, "")));
+                }
+            }
+
+            @Override
+            public void handleException(Exception e, int attempt) throws Exception {
+                System.out.println(String.format("Cannot find touchable element on scrollable, %s attempt", Utils.convertToOrdinal(attempt)));
+                if (!"NATIVE".equals(currentContext)) {
+                    switchToWebContext();
+
+                    // Might switch to the wrong web context on the first attempt; retry before scrolling down
+                    if (attempt == 1) {
+                        return;
+                    }
+                }
+
+                if (scrollableElement == null) {
+                    scrollableElement = findElementBy(By.xpath(infoMap.get("scrollableElementXpath")));
+                    hideKeyboard();
+                }
+
+                if (attempt == 1) {
+                    swipeToTop(scrollableElement.getCenter());
+                } else {
+                    Point center = scrollableElement.getCenter();
+                    Rectangle rect = scrollableElement.getRect();
+                    // Fix bug when scrollableElement is out of viewport
+                    if (center.y > screenSize.y || rect.height < 0) {
+                        center.y = screenSize.y / 2;
+                    }
+
+                    dragFromPoint(center, 0, -0.5);
+                }
+            }
+        }, 5, 0);
+
+        if (touchableElement == null) {
+            throw new Exception("Cannot find any element on scrollable parent");
+        }
+
+        return touchableElement;
+    }
+
     public boolean isButtonElement(MobileElement element) throws Exception {
         return element.getTagName().contains("Button");
     }
@@ -399,34 +493,22 @@ public class TestBase {
         String locatorText = Utils.getLocatorText(locators);
         System.out.println(String.format("Find visible web element by: %s", locatorText));
 
-        int maxTryTimes = 5;
-        int waitIntervalInMs = 3000;
-        setImplicitWaitInMiliSecond(0);
-        MobileElement visibleElement = Utils.retry(new Utils.Task<MobileElement>() {
-            @Override
-            MobileElement exec(int attempt) throws Exception {
-                List<MobileElement> foundElements = findElementsBy(locators);
-
-                MobileElement foundVisibleElement = null;
-                for (MobileElement element : foundElements) {
-                    String res = (String) executeScriptOnWebElement(element, "isElementVisible");
-                    boolean visible = "true".equals(res);
-                    if (visible) {
-                        foundVisibleElement = element;
-                        break;
-                    }
-                }
-
-                if (foundVisibleElement == null) {
-                    throw new Exception(String.format("Cannot find visible web element by: %s", locators));
-                }
-
-                return foundVisibleElement;
+        List<MobileElement> foundElements = findElementsBy(locators);
+        MobileElement foundVisibleElement = null;
+        for (MobileElement element : foundElements) {
+            String res = (String) executeScriptOnWebElement(element, "isElementVisible");
+            boolean visible = "true".equals(res);
+            if (visible) {
+                foundVisibleElement = element;
+                break;
             }
-        }, maxTryTimes, waitIntervalInMs);
-        setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
+        }
 
-        return visibleElement;
+        if (foundVisibleElement == null) {
+            throw new Exception(String.format("Cannot find visible web element by: %s", locators));
+        }
+
+        return foundVisibleElement;
     }
 
     public MobileElement findWebview() {
@@ -441,7 +523,7 @@ public class TestBase {
         System.out.println(String.format("Touch at center of element %s", element.getTagName()));
 
         TouchAction action = new TouchAction(driver)
-            .tap(TapOptions.tapOptions().withElement(ElementOption.element(element)));
+                .tap(TapOptions.tapOptions().withElement(ElementOption.element(element)));
         action.perform();
 
         return action;
@@ -450,7 +532,7 @@ public class TestBase {
     /**
      * Handle event touch element
      */
-    public void touchOnElementByType(MobileElement element, double relativePointX, double relativePointY) throws Exception {
+    public void touchOnElement(MobileElement element, double relativePointX, double relativePointY) throws Exception {
         if (isButtonElement(element)) {
             clickElement(element);
         } else {
@@ -492,7 +574,7 @@ public class TestBase {
         System.out.println(String.format("Touch at point (%s, %s)", point.x, point.y));
 
         TouchAction action = new TouchAction(driver)
-            .tap(TapOptions.tapOptions().withPosition(PointOption.point(point)));
+                .tap(TapOptions.tapOptions().withPosition(PointOption.point(point)));
         action.perform();
 
         return action;
@@ -592,9 +674,8 @@ public class TestBase {
     }
 
     public void sendKeys(String keys) throws Exception {
-        sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS);
-
         System.out.println(String.format("Send keys: %s", keys));
+        sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS);
 
         if (this.isIos) {
             char[] chars = keys.toCharArray();
@@ -603,8 +684,8 @@ public class TestBase {
             RequestBody requestBody = RequestBody.create(MediaType.parse("application/json"), requestJson.toString());
 
             Request.Builder sendKeysBuilder = new Request.Builder()
-                .post(requestBody)
-                .url(getAppiumServerUrl() + String.format("/session/%s/keys", driver.getSessionId()));
+                    .post(requestBody)
+                    .url(getAppiumServerUrl() + String.format("/session/%s/keys", driver.getSessionId()));
 
             try (Response response = httpClient.newCall(sendKeysBuilder.build()).execute()) {
                 if (!Utils.isStatusCodeSuccess(response.code())) {
@@ -712,102 +793,6 @@ public class TestBase {
         getAndroidDriver().pressKey(new KeyEvent(key));
     }
 
-    /**
-     * Scroll to find best element to touch
-     */
-    public void touchOnScrollableElement(By[] locators, String commandId) throws Exception {
-        long currentCommandId = getCurrentCommandId();
-        // Temporary disable adding baseCommandId to Appium request to avoid asserting wrong command
-        setCurrentCommandId(0);
-
-        Type type = new TypeToken<Map<String, String>>() {
-        }.getType();
-        JsonReader reader = new JsonReader(new InputStreamReader(getResourceAsStream(commandId + ".json")));
-        Map<String, String> infoMap = gson.fromJson(reader, type);
-
-        Document sourceElementDoc = loadXMLFromString(infoMap.get("touchedElementSource"));
-        Element sourceElement = sourceElementDoc.getRootElement();
-        Point screenSize = getScreenSize();
-        String sourceElementXpath = infoMap.get("touchedElementXpath");
-
-        MobileElement touchableElement = Utils.retry(new Utils.Task<MobileElement>() {
-            private MobileElement scrollableElement;
-            private List<String> potentialXpathList = new ArrayList<>();
-            private String targetElementXpath;
-
-            @Override
-            MobileElement exec(int attempt) throws Exception {
-
-                try {
-                    return findElementBy(null, Config.VISIBILITY_TIMEOUT_IN_MS, locators);
-                } catch (Exception e) {
-                    potentialXpathList.clear();
-                    Document source = loadXMLFromString(driver.getPageSource());
-                    List<Node> elementsByTagName = source.selectNodes("//" + sourceElement.getName());
-                    for (Node itemNode : elementsByTagName) {
-                        if (itemNode.getNodeType() != Node.ELEMENT_NODE) {
-                            continue;
-                        }
-
-                        boolean isEqual = compareNodes(sourceElement, (Element) itemNode);
-                        if (isEqual) {
-                            potentialXpathList.add(itemNode.getUniquePath());
-                        }
-                    }
-
-                    if (!potentialXpathList.isEmpty()) {
-                        for (String xpath : potentialXpathList) {
-                            if (sourceElementXpath.equals(xpath)) {
-                                targetElementXpath = xpath;
-                                break;
-                            }
-                        }
-
-                        if (targetElementXpath == null) {
-                            targetElementXpath = potentialXpathList.get(0);
-                        }
-                    }
-
-                    if (targetElementXpath == null) {
-                        throw new Exception();
-                    }
-
-                    return findElementBy(By.xpath(targetElementXpath.replace(IOS_XPATH_REDUNDANT_PREFIX, "")));
-                }
-            }
-
-            @Override
-            public void handleException(Exception e, int attempt) throws Exception {
-                System.out.println(String.format("Cannot find touchable element, %s attempt", Utils.convertToOrdinal(attempt)));
-
-                if (scrollableElement == null) {
-                    scrollableElement = findElementBy(By.xpath(infoMap.get("scrollableElementXpath")));
-                    hideKeyboard();
-                }
-
-                if (attempt == 1) {
-                    swipeToTop(scrollableElement.getCenter());
-                } else {
-                    Point center = scrollableElement.getCenter();
-                    Rectangle rect = scrollableElement.getRect();
-                    // Fix bug when scrollableElement is out of viewport
-                    if (center.y > screenSize.y || rect.height < 0) {
-                        center.y = screenSize.y / 2;
-                    }
-
-                    dragFromPoint(center, 0, -0.5);
-                }
-            }
-        }, 10, 0);
-
-        if (touchableElement == null) {
-            throw new Exception("Cannot find any element to touch");
-        }
-
-        setCurrentCommandId(currentCommandId);
-        touchAtRelativePointOfElement(touchableElement, Double.parseDouble(infoMap.get("touchedElementRelativeX")), Double.parseDouble(infoMap.get("touchedElementRelativeY")));
-    }
-
     public void hideKeyboard() {
         try {
             if (this.isIos) {
@@ -896,8 +881,8 @@ public class TestBase {
         Thread.sleep(durationInMs);
     }
 
-    protected Document loadXMLFromString(String xml) throws Exception {
-        return DocumentHelper.parseText(xml);
+    protected Document loadXMLFromString(String xml) {
+        return Jsoup.parse(xml, Parser.xmlParser());
     }
 
     protected InputStream getResourceAsStream(String path) {
@@ -905,7 +890,7 @@ public class TestBase {
     }
 
     protected boolean compareNodes(Element expected, Element actual) {
-        if (!expected.getName().equals(actual.getName())) {
+        if (!expected.tagName().equals(actual.tagName())) {
             return false;
         }
 
@@ -915,8 +900,8 @@ public class TestBase {
             String v1 = null;
             String v2 = null;
             try {
-                v1 = expected.attributeValue(attrName);
-                v2 = actual.attributeValue(attrName);
+                v1 = expected.attr(attrName);
+                v2 = actual.attr(attrName);
             } catch (Exception ignored) {
             }
 
@@ -925,13 +910,13 @@ public class TestBase {
             }
         }
 
-        if (expected.elements().size() != actual.elements().size()) {
+        if (expected.children().size() != actual.children().size()) {
             return false;
         }
 
-        for (int i = 0; i < expected.elements().size(); i++) {
-            Element expectedChild = expected.elements().get(i);
-            Element actualChild = actual.elements().get(i);
+        for (int i = 0; i < expected.children().size(); i++) {
+            Element expectedChild = expected.child(i);
+            Element actualChild = actual.child(i);
             boolean isEqual = compareNodes(expectedChild, actualChild);
             if (!isEqual) {
                 return false;
@@ -972,9 +957,9 @@ public class TestBase {
         deviceListUriBuilder.addParameter("deviceGroup", (String) capabilities.getCapability("deviceGroup"));
 
         Request.Builder deviceListBuilder = new Request.Builder()
-            .url(deviceListUriBuilder.build().toURL())
-            .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
-            .get();
+                .url(deviceListUriBuilder.build().toURL())
+                .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+                .get();
 
         try (Response response = httpClient.newCall(deviceListBuilder.build()).execute()) {
             if (!Utils.isStatusCodeSuccess(response.code())) {
@@ -1008,18 +993,18 @@ public class TestBase {
         String platformName = (String) capabilities.getCapability(MobileCapabilityType.PLATFORM_NAME);
         while (tryTime <= Config.DEVICE_WAITING_MAX_TRY_TIMES) {
             System.out.println(String.format("Is device with capabilities: (deviceName: %s, deviceGroup: %s, platformName: %s, platformVersion: %s) online? Retrying at %s time",
-                deviceName,
-                deviceGroup,
-                platformName,
-                platformVersion,
-                Utils.convertToOrdinal(tryTime)));
+                    deviceName,
+                    deviceGroup,
+                    platformName,
+                    platformVersion,
+                    Utils.convertToOrdinal(tryTime)));
             device = getAvailableDevice(capabilities);
             if (device != null) {
                 System.out.println(String.format("Device is found with capabilities: (deviceName: %s, deviceGroup: %s, platformName: %s, platformVersion: %s)",
-                    device.deviceName,
-                    deviceGroup,
-                    device.platformName,
-                    device.platformVersion
+                        device.deviceName,
+                        deviceGroup,
+                        device.platformName,
+                        device.platformVersion
                 ));
                 break;
             }
@@ -1029,10 +1014,10 @@ public class TestBase {
 
         if (device == null) {
             throw new Exception(String.format("Cannot find any online devices with capabilites: (deviceName: %s, deviceGroup: %s,platformName: %s, platformVersion: %s)",
-                deviceName,
-                deviceGroup,
-                platformName,
-                platformVersion
+                    deviceName,
+                    deviceGroup,
+                    platformName,
+                    platformVersion
             ));
         }
         return device;
@@ -1042,10 +1027,10 @@ public class TestBase {
         String appUrl = "";
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-            .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
-            .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-            .addHeader(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
-            .build();
+                .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
+                .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                .addHeader(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+                .build();
 
         try (Response response = client.newCall(request).execute()) {
             String body = response.body().string();
@@ -1054,6 +1039,30 @@ public class TestBase {
         }
 
         return appUrl;
+    }
+
+    public void cropRect(Rectangle rect, Rectangle boundRect) {
+        if (rect.x < boundRect.x) {
+            rect.x = boundRect.x;
+        }
+        else if (rect.x > boundRect.x + boundRect.width) {
+            rect.x = boundRect.x + boundRect.width;
+        }
+
+        if (rect.y < boundRect.y) {
+            rect.y = boundRect.y;
+        }
+        else if (rect.y > boundRect.y + boundRect.height) {
+            rect.y = boundRect.y + boundRect.height;
+        }
+
+        if (rect.x + rect.width > boundRect.x + boundRect.width) {
+            rect.width = boundRect.x + boundRect.width - rect.x;
+        }
+
+        if (rect.y + rect.height > boundRect.y + boundRect.height) {
+            rect.height = boundRect.y + boundRect.height - rect.y;
+        }
     }
 
     public void saveDebugResource() {
@@ -1085,6 +1094,7 @@ public class TestBase {
     }
 
     public void setCurrentCommandId(long currentCommandId) {
+        System.out.println(String.format("Current command: %s", currentCommandId));
         if (this.proxy != null) {
             this.proxy.currentCommandId = currentCommandId;
         }

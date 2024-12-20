@@ -1,5 +1,6 @@
 package com.kobiton.scriptlessautomation;
 
+import org.jsoup.nodes.Element;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Rectangle;
 
@@ -20,6 +21,26 @@ public class Utils {
         }
 
         return null;
+    }
+
+    public static String getXPath(Element element) {
+        StringBuilder xpath = new StringBuilder();
+
+        while (element != null) {
+            String tagName = element.tagName();
+            int index = 1;
+
+            for (Element sibling = element.previousElementSibling(); sibling != null; sibling = sibling.previousElementSibling()) {
+                if (sibling.tagName().equals(tagName)) {
+                    index++;
+                }
+            }
+
+            xpath.insert(0, "/" + tagName + (index > 1 ? "[" + index + "]" : ""));
+            element = element.parent();
+        }
+
+        return xpath.toString();
     }
 
     public static String convertToOrdinal(int i) {
@@ -47,7 +68,7 @@ public class Utils {
     }
 
     public static boolean isRectangleInclude(Rectangle rect1, Rectangle rect2) {
-        return rect1.x <= rect2.x && 
+        return rect1.x <= rect2.x &&
             rect1.y <= rect2.y &&
             rect1.x + rect1.width >= rect2.x + rect2.width &&
             rect1.y + rect1.height >= rect2.y + rect2.height;

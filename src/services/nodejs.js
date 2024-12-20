@@ -269,7 +269,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
             // eslint-disable-next-line max-len
             lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
             // eslint-disable-next-line max-len
-            lines.push(new Line(`await this.touchOnElementByType(${elementVarName}, ${x}, ${y})`))
+            lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
           }
           else {
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
@@ -281,12 +281,12 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           }
         } break
 
-        case 'touchOnScrollableElement': {
+        case 'touchOnScrollableParent': {
           const {elementInfo} = action
           const {touchedElementRelativeX, touchedElementRelativeY} = elementInfo
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
           // TODO: due to rush time, we use touchOnElementByType instead
-          // of touchOnScrollableElement temporary
+          // of touchOnScrollableParent temporary
           const elementVarName = `element${rawLocatorVarName}`
           // eslint-disable-next-line max-len
           lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))

@@ -26,7 +26,7 @@ namespace AppiumTest
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.StackTrace);
+                Log(e.ToString());
                 SaveDebugResource();
                 throw;
             }
@@ -35,7 +35,7 @@ namespace AppiumTest
         public override void Setup(AppiumOptions desiredCaps, double retinaScale)
         {
             base.Setup(desiredCaps, retinaScale);
-            Console.WriteLine($"View session at: {{portalUrl}}/sessions/{GetKobitonSessionId()}");
+            Log($"View session at: {{portalUrl}}/sessions/{GetKobitonSessionId()}");
         }
 
         [TearDown]

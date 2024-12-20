@@ -3,6 +3,27 @@ import BPromise from 'bluebird'
 const fs = BPromise.promisifyAll(require('fs'))
 
 class Utils {
+  async retry(task, maxAttempts, intervalInMs) {
+    maxAttempts = Math.max(maxAttempts, 1)
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await task(attempt)
+      }
+      catch (e) {
+        if (attempt === maxAttempts) {
+          throw e
+        }
+      }
+
+      if (intervalInMs > 0) {
+        await BPromise.delay(intervalInMs)
+      }
+    }
+
+    return null
+  }
+
   convertToOrdinal(i) {
     const suffixes = ['th', 'st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th', 'th']
 

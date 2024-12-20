@@ -214,8 +214,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
       testCaseLines.push(new Line('[Test]', 1))
       testCaseLines.push(new Line(`public void ${testCaseMethodName}() {`))
-      testCaseLines.push(new Line('try', 1))
-      testCaseLines.push(new Line('{'))
 
       if (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName) {
         testCaseLines.push(new Line(
@@ -232,13 +230,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       testCaseLines.push(new Line('RunTest();'))
 
       testCaseLines.push(new Line('}', -1))
-      testCaseLines.push(new Line('catch (Exception ex)'))
-      testCaseLines.push(new Line('{'))
-      testCaseLines.push(new Line('Console.WriteLine("An exception occured: " + ex.Message);', 1))
-      testCaseLines.push(new Line('throw;'))
-      testCaseLines.push(new Line('}', -1))
-      testCaseLines.push(new Line('}', -1))
-      testCaseLines.push(new Line(''))
     }
 
     return testCaseLines
@@ -298,7 +289,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
             // eslint-disable-next-line max-len
             lines.push(new Line(`AppiumWebElement ${elementVarName} = FindElementBy(${findingElementTimeout}, ${locatorVarName});`))
             // eslint-disable-next-line max-len
-            lines.push(new Line(`TouchOnElementByType(${elementVarName}, ${x}, ${y});`))
+            lines.push(new Line(`TouchOnElement(${elementVarName}, ${x}, ${y});`))
           }
           else {
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
@@ -309,7 +300,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
           }
         } break
 
-        case 'touchOnScrollableElement': {
+        case 'touchOnScrollableParent': {
           const {elementInfo} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
           // eslint-disable-next-line max-len

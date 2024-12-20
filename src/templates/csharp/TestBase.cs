@@ -87,7 +87,7 @@ namespace AppiumTest
         public void SwitchContext(string context)
         {
             if (currentContext == context) return;
-            Console.WriteLine($"Switch to {context} context");
+            Log($"Switch to {context} context");
             driver.Context = context;
             currentContext = context;
         }
@@ -105,128 +105,131 @@ namespace AppiumTest
 
         public string SwitchToWebContext()
         {
-            for (int tryTime = 1; tryTime <= 3; tryTime++)
+            Log("Finding a web context");
+            List<ContextInfo> contextInfos = new List<ContextInfo>();
+
+            SwitchToNativeContext();
+            XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
+            string textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
+            List<string> nativeTexts = new List<string>();
+            var textNodes = nativeDocument.SelectNodes(textNodeSelector);
+
+            if (textNodes != null)
             {
-                Console.WriteLine($"Find a web context, {Utils.ConvertToOrdinal(tryTime)} time");
-                List<ContextInfo> contextInfos = new List<ContextInfo>();
-
-                SwitchToNativeContext();
-                HtmlDocument nativeDocument = new HtmlDocument();
-                nativeDocument = LoadXMLFromString(driver.PageSource);
-                string textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
-                List<string> nativeTexts = new List<string>();
-                var textNodes = nativeDocument.DocumentNode.SelectNodes(textNodeSelector);
-
-                if (textNodes != null)
+                foreach (XmlNode element in textNodes)
                 {
-                    foreach (HtmlNode element in nativeDocument.DocumentNode.SelectNodes(textNodeSelector))
+                    if (element.NodeType != XmlNodeType.Element) continue;
+                    string textAttr = element.Attributes[isIos ? "value" : "text"].Value;
+                    if (textAttr == null)
+                        textAttr = "";
+                    textAttr = textAttr.Trim().ToLower();
+                    if (!string.IsNullOrEmpty(textAttr))
+                        nativeTexts.Add(textAttr);
+                }
+            }
+
+            HashSet<string> contexts = new HashSet<string>(driver.Contexts);
+            foreach (string context in contexts)
+            {
+                if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
+                {
+                    string source = null;
+                    try
                     {
-                        if (element.NodeType != HtmlNodeType.Element) continue;
-                        string textAttr = element.Attributes[isIos ? "value" : "text"].Value;
-                        if (textAttr == null)
-                            textAttr = "";
-                        textAttr = textAttr.Trim().ToLower();
-                        if (!string.IsNullOrEmpty(textAttr))
-                            nativeTexts.Add(textAttr);
+                        SwitchContext(context);
+                        source = driver.PageSource;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
+                        continue;
+                    }
+
+                    if (source == null) continue;
+                    ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
+                    if (contextInfo == null)
+                    {
+                        contextInfo = new ContextInfo(context);
+                        contextInfos.Add(contextInfo);
+                    }
+
+                    contextInfo.sourceLength = source.Length;
+                    if (nativeTexts.IsNullOrEmpty()) continue;
+
+                    HtmlDocument htmlDoc = LoadHTMLFromString(source);
+                    HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("/html/body");
+                    if (bodyElement == null) continue;
+
+                    string bodyString = Utils.GetAllText(bodyElement).ToLower();
+
+                    long matchTexts = 0;
+                    foreach (string nativeText in nativeTexts)
+                    {
+                        if (bodyString.Contains(nativeText)) matchTexts++;
+                    }
+
+                    contextInfo.matchTexts = matchTexts;
+                    contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
+                    if (contextInfo.matchTextsPercent >= 80)
+                    {
+                        break;
                     }
                 }
+            }
 
-                HashSet<string> contexts = new HashSet<string>(driver.Contexts);
-                foreach (string context in contexts)
+            if (!contextInfos.IsNullOrEmpty())
+            {
+                string bestWebContext;
+                contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
+                    (int)(c2.matchTextsPercent - c1.matchTextsPercent));
+                if (contextInfos[0].matchTextsPercent > 40)
                 {
-                    if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
-                    {
-                        string source = null;
-                        try
-                        {
-                            SwitchContext(context);
-                            source = driver.PageSource;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Bad context {context}, error \"{ex.Message}\", skipping...");
-                            continue;
-                        }
-
-                        if (source == null) continue;
-                        ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
-                        if (contextInfo == null)
-                        {
-                            contextInfo = new ContextInfo(context);
-                            contextInfos.Add(contextInfo);
-                        }
-
-                        contextInfo.sourceLength = source.Length;
-                        if (nativeTexts.IsNullOrEmpty()) continue;
-
-                        HtmlDocument htmlDoc = LoadXMLFromString(source);
-                        HtmlNode bodyElements = htmlDoc.DocumentNode.SelectSingleNode("/html/body");
-                        if (bodyElements == null) continue;
-
-                        HtmlNode bodyElement = bodyElements.FirstChild;
-
-                        string bodyString = bodyElement.InnerText.ToLower();
-                        long matchTexts = 0;
-                        foreach (string nativeText in nativeTexts)
-                        {
-                            if (bodyString.Contains(nativeText)) matchTexts++;
-                        }
-
-                        contextInfo.matchTexts = matchTexts;
-                        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
-                        if (contextInfo.matchTextsPercent >= 80)
-                        {
-                            break;
-                        }
-                    }
+                    bestWebContext = contextInfos[0].context;
+                }
+                else
+                {
+                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
+                    bestWebContext = contextInfos[0].context;
                 }
 
-                if (!contextInfos.IsNullOrEmpty())
-                {
-                    string bestWebContext;
-                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
-                        (int)(c2.matchTextsPercent - c1.matchTextsPercent));
-                    if (contextInfos[0].matchTextsPercent > 40)
-                    {
-                        bestWebContext = contextInfos[0].context;
-                    }
-                    else
-                    {
-                        contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
-                        bestWebContext = contextInfos[0].context;
-                    }
-
-                    SwitchContext(bestWebContext);
-                    SetImplicitWaitInMiliSecond(Config.ImplicitWaitInMs);
-                    Console.WriteLine($"Switched to {bestWebContext} web context successfully");
-                    return bestWebContext;
-                }
-
-                Thread.Sleep(10000);
+                SwitchContext(bestWebContext);
+                SetImplicitWaitInMiliSecond(Config.ImplicitWaitInMs);
+                Log($"Switched to {bestWebContext} web context successfully");
+                return bestWebContext;
             }
 
             throw new Exception("Cannot find any web context");
         }
 
-        protected HtmlDocument LoadXMLFromString(string xml)
+        protected XmlDocument LoadXMLFromString(string xml)
         {
-            HtmlDocument htmlDocument = new HtmlDocument();
-            htmlDocument.LoadHtml(xml);
-            return htmlDocument;
+            XmlDocument xmlDoc = new XmlDocument();
+            xmlDoc.LoadXml(xml);
+            return xmlDoc;
         }
 
-        public Rectangle FindWebElementRect(bool isOnKeyboard, params By[] locatorVarName)
+        protected HtmlDocument LoadHTMLFromString(string html)
         {
-            Console.WriteLine($"Finding webview element rectangle with locator {locatorVarName}");
+            HtmlDocument htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(html);
+            return htmlDoc;
+        }
+
+        public Rectangle FindWebElementRect(bool isOnKeyboard, params By[] locators)
+        {
             if (!isOnKeyboard)
             {
                 HideKeyboard();
             }
 
-            SwitchToWebContext();
-            AppiumWebElement elementVarName = FindVisibleWebElement(locatorVarName);
-            ScrollToWebElement(elementVarName);
+            AppiumWebElement elementVarName = Utils.Retry((attempt) =>
+            {
+                Log($"Finding webview element rectangle attempt {Utils.ConvertToOrdinal(attempt)} with locator: {Utils.GetLocatorText(locators)}");
+                SwitchToWebContext();
+                return FindVisibleWebElement(locators);
+            }, null, 3, 3000);
 
+            ScrollToWebElement(elementVarName);
             Rectangle webRectVarName = GetWebElementRect(elementVarName);
             SwitchToNativeContext();
             return CalculateNativeRect(webRectVarName);
@@ -240,7 +243,7 @@ namespace AppiumTest
 
         public void ScrollToWebElement(AppiumWebElement element)
         {
-            Console.WriteLine($"Scroll to web element {element.TagName}");
+            Log($"Scroll to web element {element.TagName}");
             ExecuteScriptOnWebElement(element, "scrollIntoView");
         }
 
@@ -269,7 +272,7 @@ namespace AppiumTest
             );
 
             AppiumWebElement topToolbar = null;
-            if (this.isIos)
+            if (isIos)
             {
                 try
                 {
@@ -279,13 +282,13 @@ namespace AppiumTest
                 }
                 catch (Exception ignored)
                 {
-                    HtmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-                    HtmlNode webviewNode = nativeDocument.DocumentNode.SelectSingleNode("//XCUIElementTypeWebView");
-                    HtmlNode curElement = webviewNode.ParentNode;
+                    XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
+                    XmlNode webviewNode = nativeDocument.SelectSingleNode("//XCUIElementTypeWebView");
+                    XmlNode curElement = webviewNode.ParentNode;
 
                     while (curElement != null)
                     {
-                        HtmlNode firstChildElement = curElement.SelectSingleNode("//XCUIElementTypeWebView");
+                        XmlNode firstChildElement = curElement.SelectSingleNode("./*");
 
                         Rectangle firstChildRect = new Rectangle(
                             int.Parse(firstChildElement.Attributes["x"].Value),
@@ -297,7 +300,7 @@ namespace AppiumTest
                         if (!webviewRect.Equals(firstChildRect) &&
                             Utils.IsRectangleInclude(webviewRect, firstChildRect))
                         {
-                            string topToolbarXpath = firstChildElement.XPath.Replace(IosXpathRedundantPrefix, "");
+                            string topToolbarXpath = Utils.GetXPathOfNode(firstChildElement).Replace(IosXpathRedundantPrefix, "");
                             topToolbar = FindElementBy(By.XPath(topToolbarXpath));
                             break;
                         }
@@ -334,6 +337,8 @@ namespace AppiumTest
                 webElementRect.Width,
                 webElementRect.Height
             );
+
+            nativeRect = CropRect(nativeRect, webviewRect);
             return nativeRect;
         }
 
@@ -341,7 +346,7 @@ namespace AppiumTest
             bool multiple, params By[] locators)
         {
             string locatorText = Utils.GetLocatorText(locators);
-            Console.WriteLine($"Find element by: {locatorText}");
+            Log($"Find element by: {locatorText}");
             string notFoundMessage = $"Cannot find element by: {locatorText}";
 
             if (locators.Length == 1)
@@ -451,7 +456,7 @@ namespace AppiumTest
         public AppiumWebElement FindVisibleWebElement(params By[] locators)
         {
             string locatorText = Utils.GetLocatorText(locators);
-            Console.WriteLine($"Find visible web element by: {locatorText}");
+            Log($"Find visible web element by: {locatorText}");
 
             List<AppiumWebElement> foundElements = FindElementsBy(locators);
             AppiumWebElement visibleElement = null;
@@ -483,7 +488,7 @@ namespace AppiumTest
          */
         public TouchAction TouchAtCenterOfElement(AppiumWebElement element)
         {
-            Console.WriteLine($"Touch at center of element {element.TagName}");
+            Log($"Touch at center of element {element.TagName}");
 
             TouchAction action = new TouchAction(driver);
             action.Tap(element);
@@ -511,7 +516,7 @@ namespace AppiumTest
          */
         public void ClickElement(AppiumWebElement element)
         {
-            Console.WriteLine($"Click on element with type: {element.TagName}");
+            Log($"Click on element with type: {element.TagName}");
             element.Click();
         }
 
@@ -521,8 +526,7 @@ namespace AppiumTest
         public TouchAction TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX,
             double relativePointY)
         {
-            Console.WriteLine(
-                $"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
+            Log($"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
 
             return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
         }
@@ -600,7 +604,7 @@ namespace AppiumTest
                 },
                 (exception, attempt) =>
                 {
-                    Console.WriteLine($"Cannot find touchable element, ${Utils.ConvertToOrdinal(attempt)} attempt");
+                    Log($"Cannot find touchable element, ${Utils.ConvertToOrdinal(attempt)} attempt");
                     if (scrollableElement == null)
                     {
                         scrollableElement = FindElementBy(By.XPath((string)infoObject.scrollableElementXpath));
@@ -645,7 +649,7 @@ namespace AppiumTest
          */
         public TouchAction TouchAtPoint(double relativePointX, double relativePointY)
         {
-            Console.WriteLine($"Touch at relative point ({relativePointX}, {relativePointY})");
+            Log($"Touch at relative point ({relativePointX}, {relativePointY})");
 
             Point absolutePoint = GetAbsolutePoint(relativePointX, relativePointY);
             return TouchAtPoint(absolutePoint);
@@ -656,7 +660,7 @@ namespace AppiumTest
          */
         public TouchAction TouchAtPoint(Point point)
         {
-            Console.WriteLine($"Touch at point ({point.X}, {point.Y})");
+            Log($"Touch at point ({point.X}, {point.Y})");
 
             TouchAction action = new TouchAction(driver);
             action.Tap(point.X, point.Y);
@@ -698,8 +702,7 @@ namespace AppiumTest
         public void SwipeByPoint(double fromRelativePointX, double fromRelativePointY, double toRelativePointX,
             double toRelativePointY, int durationInMs)
         {
-            Console.Write(
-                $"Swipe from relative point ({fromRelativePointX}, {fromRelativePointY}) to relative point ({toRelativePointX}, {toRelativePointY}) with duration {durationInMs}");
+            Log($"Swipe from relative point ({fromRelativePointX}, {fromRelativePointY}) to relative point ({toRelativePointX}, {toRelativePointY}) with duration {durationInMs}");
 
             Point fromPoint = GetAbsolutePoint(fromRelativePointX, fromRelativePointY);
             Point toPoint = GetAbsolutePoint(toRelativePointX, toRelativePointY);
@@ -712,8 +715,7 @@ namespace AppiumTest
          */
         public void SwipeByPoint(Point fromPoint, Point toPoint, int durationInMs)
         {
-            Console.WriteLine(
-                $"Swipe from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y}) with duration {durationInMs}");
+            Log($"Swipe from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y}) with duration {durationInMs}");
 
             PointerInputDevice finger = new PointerInputDevice(PointerKind.Touch, "finger");
             ActionSequence sequence = new ActionSequence(finger, 0);
@@ -733,8 +735,7 @@ namespace AppiumTest
         public void SwipeToTop(Point fromPoint)
         {
             Point toPoint = new Point(fromPoint.X, GetScreenSize().Y - 10);
-            Console.WriteLine(
-                $"Swipe to top from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
+            Log($"Swipe to top from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
 
             SwipeByPoint(fromPoint, toPoint, 100);
         }
@@ -770,7 +771,7 @@ namespace AppiumTest
                 sequence.AddAction(finger.CreatePointerUp(MouseButton.Middle));
             }
 
-            Console.WriteLine($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
+            Log($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
             driver.PerformActions(new List<ActionSequence> { sequence });
         }
 
@@ -778,7 +779,7 @@ namespace AppiumTest
         {
             sleep(Config.SleepTimeBeforeSendKeysInMs);
 
-            Console.WriteLine($"Send keys: {keys}");
+            Log($"Send keys: {keys}");
 
             if (isIos)
             {
@@ -820,6 +821,7 @@ namespace AppiumTest
                 }
                 catch (Exception ignored)
                 {
+                    Log(ignored.ToString());
                     GetAndroidDriver().Keyboard.SendKeys(keys);
                 }
             }
@@ -827,20 +829,20 @@ namespace AppiumTest
 
         public void SendKeys(AppiumWebElement element, string keys)
         {
-            Console.WriteLine($"Send keys '{keys}' on element {element.TagName}");
+            Log($"Send keys '{keys}' on element {element.TagName}");
 
             element.SendKeys(keys);
         }
 
         public void ClearTextField(int maxChars)
         {
-            Console.WriteLine($"Clear text field, maximum {maxChars} characters");
+            Log($"Clear text field, maximum {maxChars} characters");
             PressMultiple(PressTypes.Delete, maxChars);
         }
 
         public void Press(PressTypes type)
         {
-            Console.WriteLine($"Press on {type} key");
+            Log($"Press on {type} key");
 
             switch (type)
             {
@@ -920,7 +922,7 @@ namespace AppiumTest
 
         public void PressMultiple(PressTypes type, int count)
         {
-            Console.WriteLine($"Press on {type} key {count} times");
+            Log($"Press on {type} key {count} times");
 
             switch (type)
             {
@@ -964,7 +966,7 @@ namespace AppiumTest
                     if (!GetAndroidDriver().IsKeyboardShown()) return;
                 }
 
-                Console.WriteLine("Keyboard is shown, hide it");
+                Log("Keyboard is shown, hide it");
                 driver.HideKeyboard();
             }
             catch (Exception ignored)
@@ -1056,7 +1058,7 @@ namespace AppiumTest
 
         public void sleep(int durationInMs)
         {
-            Console.WriteLine($"Sleep for {durationInMs} ms");
+            Log($"Sleep for {durationInMs} ms");
             Thread.Sleep(durationInMs);
         }
 
@@ -1173,6 +1175,44 @@ namespace AppiumTest
             return appUrl;
         }
 
+        public Rectangle CropRect(Rectangle rect, Rectangle boundRect)
+        {
+            if (rect.X < boundRect.X)
+            {
+                rect.X = boundRect.X;
+            }
+            else if (rect.X > boundRect.X + boundRect.Width)
+            {
+                rect.X = boundRect.X + boundRect.Width;
+            }
+
+            if (rect.Y < boundRect.Y)
+            {
+                rect.Y = boundRect.Y;
+            }
+            else if (rect.Y > boundRect.Y + boundRect.Height)
+            {
+                rect.Y = boundRect.Y + boundRect.Height;
+            }
+
+            if (rect.X + rect.Width > boundRect.X + boundRect.Width)
+            {
+                rect.Width = boundRect.X + boundRect.Width - rect.X;
+            }
+
+            if (rect.Y + rect.Height > boundRect.Y + boundRect.Height)
+            {
+                rect.Height = boundRect.Y + boundRect.Height - rect.Y;
+            }
+
+            return rect;
+        }
+
+        public void Log(string str)
+        {
+            TestContext.Progress.WriteLine(str);
+        }
+
         public void SaveDebugResource()
         {
             try
@@ -1182,7 +1222,7 @@ namespace AppiumTest
                 debugDirName = Regex.Replace(debugDirName, "[^a-zA-Z0-9]", "_");
                 string debugDirPath = Path.Combine(rootDir, "debug", debugDirName);
 
-                Console.WriteLine($"Save source & screenshot for debugging at {debugDirPath}");
+                Log($"Save source & screenshot for debugging at {debugDirPath}");
                 Directory.CreateDirectory(debugDirPath);
 
                 string source = driver.PageSource;
@@ -1194,7 +1234,7 @@ namespace AppiumTest
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.StackTrace);
+                Log(e.StackTrace);
             }
         }
 
@@ -1267,13 +1307,11 @@ namespace AppiumTest
                 (string)capabilities.ToCapabilities().GetCapability(MobileCapabilityType.PlatformName);
             while (tryTime <= Config.DeviceWaitingMaxTryTimes)
             {
-                Console.WriteLine(
-                    $"Is device with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion}) online? Retrying at {Utils.ConvertToOrdinal(tryTime)} time");
+                Log($"Is device with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion}) online? Retrying at {Utils.ConvertToOrdinal(tryTime)} time");
                 device = GetAvailableDevice(capabilities).Result;
                 if (device != null)
                 {
-                    Console.WriteLine(
-                        $"Device is found with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion})");
+                    Log($"Device is found with capabilities: (deviceName: {deviceName}, deviceGroup: {deviceGroup}, platformName: {platformName}, platformVersion: {platformVersion})");
                     break;
                 }
 

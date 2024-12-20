@@ -2,13 +2,14 @@
 using System.Drawing;
 using System.Text;
 using System.Xml;
+using HtmlAgilityPack;
 using OpenQA.Selenium.Appium;
 
 namespace AppiumTest
 {
     public static class Utils
     {
-        public static T Retry<T>(Func<int, T> execFn, Func<Exception, int, int>? handleExceptionFn = null,
+        public static T? Retry<T>(Func<int, T> execFn, Func<Exception, int, int>? handleExceptionFn = null,
             int maxAttempts = 1, int intervalInMs = 0)
         {
             for (int attempt = 1; attempt <= Math.Max(maxAttempts, 1); attempt++)
@@ -23,7 +24,7 @@ namespace AppiumTest
 
                     if (attempt == maxAttempts)
                     {
-                        throw e;
+                        throw;
                     }
                 }
 
@@ -33,7 +34,29 @@ namespace AppiumTest
                 }
             }
 
-            return default(T);
+            return default;
+        }
+
+        public static string GetAllText(HtmlNode? node)
+        {
+            if (node == null)
+                return string.Empty;
+
+            var textBuilder = new StringBuilder();
+
+            if (node.NodeType == HtmlNodeType.Text)
+            {
+                string text = node.InnerText.Trim();
+                if (!string.IsNullOrEmpty(text))
+                    textBuilder.Append(text + " ");
+            }
+
+            foreach (var child in node.ChildNodes)
+            {
+                textBuilder.Append(GetAllText(child));
+            }
+
+            return textBuilder.ToString().Trim();
         }
 
         public static string ConvertToOrdinal(int i)

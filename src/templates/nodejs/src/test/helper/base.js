@@ -101,96 +101,107 @@ export default class TestBase {
   }
 
   async switchToWebContext() {
-    for (let tryTime = 1; tryTime <= 3; tryTime++) {
-      console.log(`Find a web context, ${Utils.convertToOrdinal(tryTime)} time`)
-      const contextInfos = []
+    console.log('Finding a web context')
+    const contextInfos = []
 
-      await this.switchToNativeContext()
-      const source = await this._driver.getSource()
-      const nativeDocument = this.loadXMLFromString(source)
-      const textNodeSelector = this._isIos
-        ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
-      const elements = this._getElementsInXmlDom(nativeDocument, textNodeSelector)
+    await this.switchToNativeContext()
+    const source = await this._driver.getSource()
+    const nativeDocument = this.loadXMLFromString(source)
+    const textNodeSelector = this._isIos
+      ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
+    const elements = this._getElementsInXmlDom(nativeDocument, textNodeSelector)
 
-      const nativeTexts = []
-      for (const element of elements) {
-        let textAttr = (element.attributes[this._isIos ? 'value' : 'text'] || '')
-        textAttr = textAttr.trim().toLowerCase()
+    const nativeTexts = []
+    for (const element of elements) {
+      let textAttr = (element.attributes[this._isIos ? 'value' : 'text'] || '')
+      textAttr = textAttr.trim().toLowerCase()
 
-        if (textAttr.length > 0) nativeTexts.push(textAttr)
-      }
+      if (textAttr.length > 0) nativeTexts.push(textAttr)
+    }
 
-      // Find the most webview is usable
-      const contexts = await this.getContexts()
-      for (const context of contexts) {
-        if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
-          let source = null
-          try {
-            await this.switchContext(context)
-            source = await this._driver.getSource()
+    // Find the most webview is usable
+    const contexts = await this.getContexts()
+    for (const context of contexts) {
+      if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
+        let source = null
+        try {
+          await this.switchContext(context)
+          source = await this._driver.getSource()
+        }
+        catch (error) {
+          console.log(`Bad context ${context}, error "${error.message}", skipping...`)
+          continue
+        }
+
+        if (source === null) continue
+
+        let contextInfo = contextInfos.find(e => e.context === context)
+        if (!contextInfo) {
+          contextInfo = {
+            context,
+            sourceLength: source.length,
+            matchTextsPercent: 0
           }
-          catch (error) {
-            console.log(`Bad context ${context}, error "${error.message}", skipping...`)
-            continue
-          }
 
-          if (source === null) continue
+          contextInfos.push(contextInfo)
+        }
 
-          let contextInfo = contextInfos.find(e => e.context === context)
-          if (!contextInfo) {
-            contextInfo = {
-              context,
-              sourceLength: source.length,
-              matchTextsPercent: 0
+        if (nativeTexts.length === 0) continue
+
+        const htmlDoc = this.loadHtmlFromString(source)
+        const bodyElements = htmlDoc.getElementsByTagName('body')
+        if (bodyElements.length === 0) continue
+
+        const bodyElement = bodyElements[0]
+
+        function getAllInnerText(element) {
+          let text = ''
+          for (let i = 0; i < element.childNodes.length; i++) {
+            const node = element.childNodes[i]
+            if (node.nodeType === 3) {
+              text += node.nodeValue + ' '
+            } else if (node.nodeType === 1) {
+              text += getAllInnerText(node) + ' '
             }
-
-            contextInfos.push(contextInfo)
           }
 
-          if (nativeTexts.length === 0) continue
+          return text.trim()
+        }
 
-          const htmlDoc = this.loadHtmlFromString(source)
-          const bodyElements = htmlDoc.getElementsByTagName('body')
-          if (bodyElements.length === 0) continue
+        let bodyString = getAllInnerText(bodyElement)
 
-          const bodyElement = bodyElements[0]
-          let bodyString = (bodyElement.getAttribute('text') || '')
+        if (bodyString.length === 0) continue
+        bodyString = bodyString.toLowerCase()
 
-          if (bodyString.length === 0) continue
-          bodyString = bodyString.toLowerCase()
+        let matchTexts = 0
+        for (const nativeText of nativeTexts) {
+          if (bodyString.includes(nativeText)) matchTexts++
+        }
 
-          let matchTexts = 0
-          for (const nativeText of nativeTexts) {
-            if (bodyString.includes(nativeText)) matchTexts++
-          }
-
-          contextInfo.matchTexts = matchTexts
-          contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
-          if (contextInfo.matchTextsPercent >= 80) {
-            break
-          }
+        contextInfo.matchTexts = matchTexts
+        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
+        if (contextInfo.matchTextsPercent >= 80) {
+          break
         }
       }
+    }
 
-      if (contextInfos.length !== 0) {
-        contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
+    if (contextInfos.length !== 0) {
+      contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
 
-        let bestWebContext
-        if (contextInfos[0].matchTextsPercent > 40) {
-          bestWebContext = contextInfos[0].context
-        }
-        else {
-          contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
-          bestWebContext = contextInfos[0].context
-        }
-
-        await this.switchContext(bestWebContext)
-
-        console.log(`Switched to ${bestWebContext} web context successfully`)
-        return bestWebContext
+      let bestWebContext
+      if (contextInfos[0].matchTextsPercent > 40) {
+        bestWebContext = contextInfos[0].context
+      }
+      else {
+        contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
+        bestWebContext = contextInfos[0].context
       }
 
-      await BPromise.delay(10000)
+      await this.switchContext(bestWebContext)
+
+      console.log(`Switched to ${bestWebContext} web context successfully`)
+      return bestWebContext
     }
 
     throw new Error('Cannot find any usable web contexts')
@@ -201,17 +212,16 @@ export default class TestBase {
       await this.hideKeyboard()
     }
 
-    await this.switchToWebContext()
-    const webElement = await this.findVisibleWebElement(locators)
+    const webElement = await Utils.retry(async (attempt) => {
+      console.log(`Finding webview element rectangle attempt ${attempt} with locator: ${JSON.stringify(locators)}`)
+      await this.switchToWebContext()
+      return await this.findVisibleWebElement(locators)
+    }, 3, 3000)
+
     await this.scrollToWebElement(webElement)
-
     const webElementRect = await this.getWebElementRect(webElement)
-
     await this.switchToNativeContext()
-    const rect = await this.calculateNativeRect(webElementRect)
-    console.log(`Web element rectangle: ${JSON.stringify(rect)}`)
-
-    return rect
+    return await this.calculateNativeRect(webElementRect)
   }
 
   async executeScriptOnWebElement(element, command) {
@@ -224,7 +234,7 @@ export default class TestBase {
   async scrollToWebElement(element) {
     console.log(`Scroll to web element, ${JSON.stringify(element)}`)
     await this.executeScriptOnWebElement(element, 'scrollIntoView')
-    this.sleep(SLEEP_AFTER_ACTION)
+    await this.sleep(SLEEP_AFTER_ACTION)
   }
 
   async getWebElementRect(element) {
@@ -249,7 +259,7 @@ export default class TestBase {
     let topToolbarRect
     if (this._isIos) {
       try {
-        topToolbar = await this.findElement(0,
+        const topToolbar = await this.findElement(0,
           ["//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"]
         )
 
@@ -318,12 +328,15 @@ export default class TestBase {
       width: nativeWebElementRect.width
     })
 
-    return new Rectangle({
+    const nativeRect = new Rectangle({
       x: nativeWebElementRect.x + webElementRect.x,
       y: nativeWebElementRect.y + webElementRect.y,
       height: Math.min(webElementRect.height, nativeWebElementRect.height),
       width: Math.min(webElementRect.width, nativeWebElementRect.width)
     })
+
+    this.cropRect(nativeRect, nativeWebElementRect)
+    return nativeRect
   }
 
   async findElement(timeout, locators) {
@@ -828,6 +841,28 @@ export default class TestBase {
 
     const {url} = JSON.stringify(body)
     return url
+  }
+
+  cropRect(rect, boundRect) {
+    if (rect.x < boundRect.x) {
+      rect.x = boundRect.x
+    } else if (rect.x > boundRect.x + boundRect.width) {
+      rect.x = boundRect.x + boundRect.width
+    }
+
+    if (rect.y < boundRect.y) {
+      rect.y = boundRect.y
+    } else if (rect.y > boundRect.y + boundRect.height) {
+      rect.y = boundRect.y + boundRect.height
+    }
+
+    if (rect.x + rect.width > boundRect.x + boundRect.width) {
+      rect.width = boundRect.x + boundRect.width - rect.x
+    }
+
+    if (rect.y + rect.height > boundRect.y + boundRect.height) {
+      rect.height = boundRect.y + boundRect.height - rect.y
+    }
   }
 
   async saveDebugResource(options = {}) {

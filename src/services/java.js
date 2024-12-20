@@ -312,40 +312,57 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'touchOnElement': {
           const {x, y} = action
+
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
             lines.push(new Line(`MobileElement ${elementVarName} = findElementBy(${findingElementTimeout}, ${locatorVarName});`))
             // eslint-disable-next-line max-len
-            lines.push(new Line(`touchOnElementByType(${elementVarName}, ${x}, ${y});`))
+            lines.push(new Line(`touchOnElement(${elementVarName}, ${x}, ${y});`))
           }
           else {
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
             // eslint-disable-next-line max-len
-            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${isOnKeyboard}, ${locatorVarName});`))
+            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${locatorVarName});`))
             lines.push(
               new Line(`touchAtPoint(getAbsolutePoint(${x}, ${y}, ${nativeRectVarName}));`))
           }
         } break
 
-        case 'touchOnScrollableElement': {
-          const {elementInfo} = action
+        case 'touchOnScrollableParent': {
+          const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
-          // eslint-disable-next-line max-len
-          lines.push(new Line(`touchOnScrollableElement(${locatorVarName}, "${id}");`))
+
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
+          if (context === CONTEXTS.NATIVE) {
+            const elementVarName = `element${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`MobileElement ${elementVarName} = findElementOnScrollable(${locatorVarName});`))
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`touchOnElement(${elementVarName}, ${x}, ${y});`))
+          }
+          else {
+            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRectOnScrollable(${locatorVarName});`))
+            lines.push(
+              new Line(`touchAtPoint(getAbsolutePoint(${x}, ${y}, ${nativeRectVarName}));`))
+          }
         } break
 
         case 'touchAtPoint': {
           const {x, y} = action
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           lines.push(new Line(`touchAtPoint(${x}, ${y});`))
         } break
 
         case 'swipeFromElement': {
           const {x1, y1, x2, y2, duration} = action
+
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             /* eslint-disable */
-            !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
-
             const elementVarName = `element${rawLocatorVarName}`
             lines.push(new Line(`MobileElement ${elementVarName} = findElementBy(${findingElementTimeout}, ${locatorVarName});`))
 
@@ -364,7 +381,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           else {
             /* eslint-disable */
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${isOnKeyboard}, ${locatorVarName});`))
+            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${locatorVarName});`))
 
             const fromPointVarName = `fromPointOn${rawLocatorVarName}`
             lines.push(new Line(`Point ${fromPointVarName} = getAbsolutePoint(${x1}, ${y1}, ${nativeRectVarName});`))
@@ -379,6 +396,8 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'swipeByPoints': {
           const {x1, y1, x2, y2, duration} = action
+
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           lines.push(new Line(`swipeByPoint(${x1}, ${y1}, ${x2}, ${y2}, ${duration});`))
         } break
 
