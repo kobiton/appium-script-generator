@@ -71,7 +71,7 @@ public class TestBase {
         this.desiredCaps = desiredCaps;
         this.retinaScale = retinaScale;
         this.isIos = MobilePlatform.IOS.equalsIgnoreCase(
-                (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_NAME));
+            (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_NAME));
         this.deviceName = (String) desiredCaps.getCapability(MobileCapabilityType.DEVICE_NAME);
         this.platformVersion = (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_VERSION);
 
@@ -138,8 +138,7 @@ public class TestBase {
                 try {
                     switchContext(context);
                     source = driver.getPageSource();
-                }
-                catch (Exception ex) {
+                } catch (Exception ex) {
                     System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
                     continue;
                 }
@@ -206,8 +205,10 @@ public class TestBase {
 
     public Rectangle findWebElementRectOnScrollable(By... locators) throws Exception {
         System.out.println(String.format("Finding web element rectangle on scrollable with locator: %s", Utils.getLocatorText(locators)));
-
-        switchToWebContext();
+        try {
+            switchToWebContext();
+        }
+        catch (Exception ignored) {}
         MobileElement foundElement = findElementOnScrollable(locators);
 
         scrollToWebElement(foundElement);
@@ -230,10 +231,10 @@ public class TestBase {
         String resultString = (String) executeScriptOnWebElement(element, "getBoundingClientRect");
         JsonObject resultJson = gson.fromJson(resultString, JsonObject.class);
         Rectangle rect = new Rectangle(
-                (int) (resultJson.get("x").getAsLong() / retinaScale),
-                (int) (resultJson.get("y").getAsLong() / retinaScale),
-                (int) (resultJson.get("height").getAsLong() / retinaScale),
-                (int) (resultJson.get("width").getAsLong() / retinaScale)
+            (int) (resultJson.get("x").getAsLong() / retinaScale),
+            (int) (resultJson.get("y").getAsLong() / retinaScale),
+            (int) (resultJson.get("height").getAsLong() / retinaScale),
+            (int) (resultJson.get("width").getAsLong() / retinaScale)
         );
 
         return rect;
@@ -245,19 +246,18 @@ public class TestBase {
         MobileElement topToolbar = null;
         if (this.isIos) {
             try {
-                topToolbar = findElementBy(By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
-            }
-            catch (Exception ignored) {
+                topToolbar = findElementBy(null, 1000, By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
+            } catch (Exception ignored) {
                 Document nativeDocument = loadXMLFromString(driver.getPageSource());
                 Element webviewElement = nativeDocument.selectXpath("//XCUIElementTypeWebView").first();
                 Element curElement = webviewElement.parent();
                 while (curElement != null) {
                     Element firstChildElement = curElement.child(0);
                     Rectangle firstChildRect = new Rectangle(
-                            Integer.parseInt(firstChildElement.attr("x")),
-                            Integer.parseInt(firstChildElement.attr("y")),
-                            Integer.parseInt(firstChildElement.attr("height")),
-                            Integer.parseInt(firstChildElement.attr("width"))
+                        Integer.parseInt(firstChildElement.attr("x")),
+                        Integer.parseInt(firstChildElement.attr("y")),
+                        Integer.parseInt(firstChildElement.attr("height")),
+                        Integer.parseInt(firstChildElement.attr("width"))
                     );
 
                     if (!webviewRect.equals(firstChildRect) && Utils.isRectangleInclude(webviewRect, firstChildRect)) {
@@ -280,17 +280,17 @@ public class TestBase {
         }
 
         webviewRect = new Rectangle(
-                webviewRect.x,
-                webViewTop,
-                webviewRect.height - deltaHeight,
-                webviewRect.width
+            webviewRect.x,
+            webViewTop,
+            webviewRect.height - deltaHeight,
+            webviewRect.width
         );
 
         Rectangle nativeRect = new Rectangle(
-                webviewRect.x + webElementRect.x,
-                webviewRect.y + webElementRect.y,
-                webElementRect.height,
-                webElementRect.width);
+            webviewRect.x + webElementRect.x,
+            webviewRect.y + webElementRect.y,
+            webElementRect.height,
+            webElementRect.width);
 
         cropRect(nativeRect, webviewRect);
         return nativeRect;
@@ -449,13 +449,10 @@ public class TestBase {
             @Override
             public void handleException(Exception e, int attempt) throws Exception {
                 System.out.println(String.format("Cannot find touchable element on scrollable, %s attempt", Utils.convertToOrdinal(attempt)));
-                if (!"NATIVE".equals(currentContext)) {
+                // Might switch to the wrong web context on the first attempt; retry before scrolling down
+                if (!"NATIVE".equals(currentContext) && attempt == 1) {
                     switchToWebContext();
-
-                    // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                    if (attempt == 1) {
-                        return;
-                    }
+                    return;
                 }
 
                 if (scrollableElement == null) {
@@ -476,7 +473,7 @@ public class TestBase {
                     dragFromPoint(center, 0, -0.5);
                 }
             }
-        }, 5, 0);
+        }, 5, 3000);
 
         if (touchableElement == null) {
             throw new Exception("Cannot find any element on scrollable parent");
@@ -523,7 +520,7 @@ public class TestBase {
         System.out.println(String.format("Touch at center of element %s", element.getTagName()));
 
         TouchAction action = new TouchAction(driver)
-                .tap(TapOptions.tapOptions().withElement(ElementOption.element(element)));
+            .tap(TapOptions.tapOptions().withElement(ElementOption.element(element)));
         action.perform();
 
         return action;
@@ -574,7 +571,7 @@ public class TestBase {
         System.out.println(String.format("Touch at point (%s, %s)", point.x, point.y));
 
         TouchAction action = new TouchAction(driver)
-                .tap(TapOptions.tapOptions().withPosition(PointOption.point(point)));
+            .tap(TapOptions.tapOptions().withPosition(PointOption.point(point)));
         action.perform();
 
         return action;
@@ -684,8 +681,8 @@ public class TestBase {
             RequestBody requestBody = RequestBody.create(MediaType.parse("application/json"), requestJson.toString());
 
             Request.Builder sendKeysBuilder = new Request.Builder()
-                    .post(requestBody)
-                    .url(getAppiumServerUrl() + String.format("/session/%s/keys", driver.getSessionId()));
+                .post(requestBody)
+                .url(getAppiumServerUrl() + String.format("/session/%s/keys", driver.getSessionId()));
 
             try (Response response = httpClient.newCall(sendKeysBuilder.build()).execute()) {
                 if (!Utils.isStatusCodeSuccess(response.code())) {
@@ -957,9 +954,9 @@ public class TestBase {
         deviceListUriBuilder.addParameter("deviceGroup", (String) capabilities.getCapability("deviceGroup"));
 
         Request.Builder deviceListBuilder = new Request.Builder()
-                .url(deviceListUriBuilder.build().toURL())
-                .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
-                .get();
+            .url(deviceListUriBuilder.build().toURL())
+            .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+            .get();
 
         try (Response response = httpClient.newCall(deviceListBuilder.build()).execute()) {
             if (!Utils.isStatusCodeSuccess(response.code())) {
@@ -993,18 +990,18 @@ public class TestBase {
         String platformName = (String) capabilities.getCapability(MobileCapabilityType.PLATFORM_NAME);
         while (tryTime <= Config.DEVICE_WAITING_MAX_TRY_TIMES) {
             System.out.println(String.format("Is device with capabilities: (deviceName: %s, deviceGroup: %s, platformName: %s, platformVersion: %s) online? Retrying at %s time",
-                    deviceName,
-                    deviceGroup,
-                    platformName,
-                    platformVersion,
-                    Utils.convertToOrdinal(tryTime)));
+                deviceName,
+                deviceGroup,
+                platformName,
+                platformVersion,
+                Utils.convertToOrdinal(tryTime)));
             device = getAvailableDevice(capabilities);
             if (device != null) {
                 System.out.println(String.format("Device is found with capabilities: (deviceName: %s, deviceGroup: %s, platformName: %s, platformVersion: %s)",
-                        device.deviceName,
-                        deviceGroup,
-                        device.platformName,
-                        device.platformVersion
+                    device.deviceName,
+                    deviceGroup,
+                    device.platformName,
+                    device.platformVersion
                 ));
                 break;
             }
@@ -1014,10 +1011,10 @@ public class TestBase {
 
         if (device == null) {
             throw new Exception(String.format("Cannot find any online devices with capabilites: (deviceName: %s, deviceGroup: %s,platformName: %s, platformVersion: %s)",
-                    deviceName,
-                    deviceGroup,
-                    platformName,
-                    platformVersion
+                deviceName,
+                deviceGroup,
+                platformName,
+                platformVersion
             ));
         }
         return device;
@@ -1027,10 +1024,10 @@ public class TestBase {
         String appUrl = "";
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
-                .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
-                .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-                .addHeader(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
-                .build();
+            .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
+            .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            .addHeader(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+            .build();
 
         try (Response response = client.newCall(request).execute()) {
             String body = response.body().string();
@@ -1044,15 +1041,13 @@ public class TestBase {
     public void cropRect(Rectangle rect, Rectangle boundRect) {
         if (rect.x < boundRect.x) {
             rect.x = boundRect.x;
-        }
-        else if (rect.x > boundRect.x + boundRect.width) {
+        } else if (rect.x > boundRect.x + boundRect.width) {
             rect.x = boundRect.x + boundRect.width;
         }
 
         if (rect.y < boundRect.y) {
             rect.y = boundRect.y;
-        }
-        else if (rect.y > boundRect.y + boundRect.height) {
+        } else if (rect.y > boundRect.y + boundRect.height) {
             rect.y = boundRect.y + boundRect.height;
         }
 

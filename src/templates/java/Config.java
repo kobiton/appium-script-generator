@@ -10,7 +10,7 @@ public class Config {
     public static final String {{API_KEY}} = "{{your_api_key}}";
     public static final String APPIUM_SERVER_URL = {{appiumServerUrl}};
     public static final DEVICE_SOURCE_ENUMS DEVICE_SOURCE = DEVICE_SOURCE_ENUMS.{{deviceSource}};
-    public static final int IMPLICIT_WAIT_IN_MS = 30000;
+    public static final int IMPLICIT_WAIT_IN_MS = 10000;
     public static final int DEVICE_WAITING_MAX_TRY_TIMES = 5;
     public static final int DEVICE_WAITING_INTERVAL_IN_MS = 30000;
     public static final int SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS = 3000;

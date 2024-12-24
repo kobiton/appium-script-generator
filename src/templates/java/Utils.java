@@ -36,11 +36,29 @@ public class Utils {
                 }
             }
 
-            xpath.insert(0, "/" + tagName + (index > 1 ? "[" + index + "]" : ""));
+            boolean hasMultipleSiblings = false;
+            for (Element sibling = element.nextElementSibling(); sibling != null; sibling = sibling.nextElementSibling()) {
+                if (sibling.tagName().equals(tagName)) {
+                    hasMultipleSiblings = true;
+                    break;
+                }
+            }
+
+            if (index > 1 || hasMultipleSiblings) {
+                xpath.insert(0, "/" + tagName + "[" + index + "]");
+            } else {
+                xpath.insert(0, "/" + tagName);
+            }
+
             element = element.parent();
         }
 
-        return xpath.toString();
+        String finalXpath = xpath.toString();
+        if (finalXpath.startsWith("/#root")) {
+            finalXpath = finalXpath.substring("/#root".length());
+        }
+
+        return finalXpath;
     }
 
     public static String convertToOrdinal(int i) {

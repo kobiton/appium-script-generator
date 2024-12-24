@@ -274,7 +274,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           else {
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
             // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${isOnKeyboard}, ${locatorVarName})`))
+            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${locatorVarName})`))
             lines.push(
               // eslint-disable-next-line max-len
               new Line(`await this.touchAtPoint(await this.getAbsolutePointOfRect(${x}, ${y}, ${nativeRectVarName}))`))
@@ -323,7 +323,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           else {
             /* eslint-disable */
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${isOnKeyboard}, ${locatorVarName})`))
+            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${locatorVarName})`))
 
             const fromPointVarName = `fromPointOn${rawLocatorVarName}`
             lines.push(new Line(`const ${fromPointVarName} = await this.getAbsolutePointOfRect(${x1}, ${y1}, ${nativeRectVarName})`))

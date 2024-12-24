@@ -16,10 +16,9 @@ namespace AppiumTest
         public const string {{API_KEY}} = "{{your_api_key}}";
         public const string AppiumServerUrl = {{appiumServerUrl}};
         public const DeviceSourceEnums DeviceSource = DeviceSourceEnums.Kobiton;
-        public const int ImplicitWaitInMs = 30000;
+        public const int ImplicitWaitInMs = 10000;
         public const int DeviceWaitingMaxTryTimes = 5;
         public const int DeviceWaitingInternalInMs = 30000;
-        public const int VisibilityTimeoutInMs = 60000;
         public const int SleepTimeBeforeSendKeysInMs = 3000;
         public const string KobitonApiUrl = "{{KobitonApiUrl}}";
         {{kobitonCredential}}

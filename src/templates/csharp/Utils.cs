@@ -104,38 +104,56 @@ namespace AppiumTest
             return new Point(location.X + size.Width / 2,location.Y + size.Height / 2);
         }
 
-        public static string GetXPathOfNode(XmlNode node)
+        public static string GetXPath(XmlNode element)
         {
-            StringBuilder xpath = new StringBuilder();
+            var xpath = new StringBuilder();
 
-            while (node != null)
+            while (element != null)
             {
-                switch (node.NodeType)
+                string tagName = element.Name;
+                int index = 1;
+
+                var sibling = element.PreviousSibling;
+                while (sibling != null)
                 {
-                    case XmlNodeType.Attribute:
-                        xpath.Insert(0, "/@" + node.Name);
-                        node = ((XmlAttribute)node).OwnerElement;
-                        break;
-                    case XmlNodeType.Element:
-                        int indexInParent = GetElementIndexInParent((XmlElement)node);
-                        string nodeName = node.Name;
-
-                        if (indexInParent > 0)
-                        {
-                            nodeName += $"[{indexInParent}]";
-                        }
-
-                        xpath.Insert(0, "/" + nodeName);
-                        node = node.ParentNode;
-                        break;
-                    case XmlNodeType.Document:
-                        return xpath.ToString();
-                    default:
-                        throw new ArgumentException("Unsupported XmlNode type: " + node.NodeType);
+                    if (sibling.Name == tagName)
+                    {
+                        index++;
+                    }
+                    sibling = sibling.PreviousSibling;
                 }
+
+                bool hasMultipleSiblings = false;
+                sibling = element.NextSibling;
+                while (sibling != null)
+                {
+                    if (sibling.Name == tagName)
+                    {
+                        hasMultipleSiblings = true;
+                        break;
+                    }
+                    sibling = sibling.NextSibling;
+                }
+
+                if (index > 1 || hasMultipleSiblings)
+                {
+                    xpath.Insert(0, $"/{tagName}[{index}]");
+                }
+                else
+                {
+                    xpath.Insert(0, $"/{tagName}");
+                }
+
+                element = element.ParentNode;
             }
 
-            return xpath.ToString();
+            var finalXpath = xpath.ToString();
+            if (finalXpath.StartsWith("/#document"))
+            {
+                finalXpath = finalXpath.Substring("/#document".Length);
+            }
+
+            return finalXpath;
         }
 
         private static int GetElementIndexInParent(XmlElement element)

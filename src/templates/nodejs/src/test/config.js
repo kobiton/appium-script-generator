@@ -11,8 +11,8 @@ class Config {
     this.appiumServerUrl = //{{appiumServerUrl}}
     this.kobitonApiUrl = //{{kobitonApiUrl}}
     this.deviceSource = DEVICE_SOURCES.KOBITON
-    this.implicitWaitInMs = 30000 // 30s
-    this.explicitWaitInMs = 30000 // 30s
+    this.implicitWaitInMs = 10000 // 10s
+    this.explicitWaitInMs = 10000 // 10s
     this.newCommandTimeoutInMs = 15 * 60 * 1000 // 15m
     this.sleepBeforeSendingKeysInMs = 3000 // 3s
     this.deviceWaitingMaxTryTimes = 5

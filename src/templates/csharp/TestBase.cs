@@ -6,7 +6,6 @@ using OpenQA.Selenium.Appium.MultiTouch;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium;
 using System.Drawing;
-using System.Globalization;
 using Castle.Core.Internal;
 using System.Text;
 using HtmlAgilityPack;
@@ -119,7 +118,7 @@ namespace AppiumTest
                 foreach (XmlNode element in textNodes)
                 {
                     if (element.NodeType != XmlNodeType.Element) continue;
-                    string textAttr = element.Attributes[isIos ? "value" : "text"].Value;
+                    string? textAttr = element.Attributes?[isIos ? "value" : "text"]?.Value;
                     if (textAttr == null)
                         textAttr = "";
                     textAttr = textAttr.Trim().ToLower();
@@ -128,8 +127,8 @@ namespace AppiumTest
                 }
             }
 
-            HashSet<string> contexts = new HashSet<string>(driver.Contexts);
-            foreach (string context in contexts)
+            var contexts = driver.Contexts;
+            foreach (var context in contexts)
             {
                 if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
                 {
@@ -157,7 +156,7 @@ namespace AppiumTest
                     if (nativeTexts.IsNullOrEmpty()) continue;
 
                     HtmlDocument htmlDoc = LoadHTMLFromString(source);
-                    HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("/html/body");
+                    HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
                     if (bodyElement == null) continue;
 
                     string bodyString = Utils.GetAllText(bodyElement).ToLower();
@@ -215,16 +214,11 @@ namespace AppiumTest
             return htmlDoc;
         }
 
-        public Rectangle FindWebElementRect(bool isOnKeyboard, params By[] locators)
+        public Rectangle FindWebElementRect(params By[] locators)
         {
-            if (!isOnKeyboard)
-            {
-                HideKeyboard();
-            }
-
             AppiumWebElement elementVarName = Utils.Retry((attempt) =>
             {
-                Log($"Finding webview element rectangle attempt {Utils.ConvertToOrdinal(attempt)} with locator: {Utils.GetLocatorText(locators)}");
+                Log($"Finding web element rectangle attempt {Utils.ConvertToOrdinal(attempt)} with locator: {Utils.GetLocatorText(locators)}");
                 SwitchToWebContext();
                 return FindVisibleWebElement(locators);
             }, null, 3, 3000);
@@ -233,6 +227,25 @@ namespace AppiumTest
             Rectangle webRectVarName = GetWebElementRect(elementVarName);
             SwitchToNativeContext();
             return CalculateNativeRect(webRectVarName);
+        }
+
+        public Rectangle FindWebElementRectOnScrollable(params By[] locators)
+        {
+            Log($"Finding web element rectangle on scrollable with locator: {Utils.GetLocatorText(locators)}");
+            try
+            {
+                SwitchToWebContext();
+            }
+            catch (Exception ignored)
+            {
+                Log(ignored.Message);
+            }
+            var foundElement = FindElementOnScrollable(locators);
+
+            ScrollToWebElement(foundElement);
+            var webRect = GetWebElementRect(foundElement);
+            SwitchToNativeContext();
+            return CalculateNativeRect(webRect);
         }
 
         public Object ExecuteScriptOnWebElement(AppiumWebElement element, string command)
@@ -277,7 +290,7 @@ namespace AppiumTest
                 try
                 {
                     topToolbar =
-                        FindElementBy(By.XPath(
+                        FindElementBy(null, 1000, By.XPath(
                             "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
                 }
                 catch (Exception ignored)
@@ -300,7 +313,7 @@ namespace AppiumTest
                         if (!webviewRect.Equals(firstChildRect) &&
                             Utils.IsRectangleInclude(webviewRect, firstChildRect))
                         {
-                            string topToolbarXpath = Utils.GetXPathOfNode(firstChildElement).Replace(IosXpathRedundantPrefix, "");
+                            string topToolbarXpath = Utils.GetXPath(firstChildElement).Replace(IosXpathRedundantPrefix, "");
                             topToolbar = FindElementBy(By.XPath(topToolbarXpath));
                             break;
                         }
@@ -310,10 +323,10 @@ namespace AppiumTest
                 }
             }
 
+            int webViewTop = webviewRect.Y;
             int deltaHeight = 0;
             if (topToolbar != null)
             {
-                int webViewTop = webviewRect.Y;
                 Rectangle topToolbarRect = new Rectangle(
                     topToolbar.Location.X,
                     topToolbar.Location.Y,
@@ -326,7 +339,7 @@ namespace AppiumTest
 
             webviewRect = new Rectangle(
                 webviewRect.X,
-                webviewRect.Y,
+                webViewTop,
                 webviewRect.Width,
                 webviewRect.Height - deltaHeight
             );
@@ -448,6 +461,128 @@ namespace AppiumTest
             return FindElementsBy(null, Config.ImplicitWaitInMs, locators);
         }
 
+        /**
+         * Scroll to find best element on scrollable
+         */
+        public AppiumWebElement FindElementOnScrollable(params By[] locators)
+        {
+            var infoJsonString = File.ReadAllText($"../../../test/resources/{GetCurrentCommandId()}.json", Encoding.UTF8);
+            dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
+
+            var sourceElementDoc = new XmlDocument();
+            sourceElementDoc.LoadXml((string)infoObject.touchedElementSource);
+            XmlNode sourceElement = sourceElementDoc.DocumentElement;
+            var screenSize = GetScreenSize();
+            string sourceElementXpath = (string)infoObject.touchedElementXpath;
+
+            AppiumWebElement? scrollableElement = null;
+            var potentialXpathList = new List<string>();
+            string? targetElementXpath = null;
+
+            var touchableElement = Utils.Retry<AppiumWebElement>(
+                (attempt) =>
+                {
+                    try
+                    {
+                        var foundElement = FindElementBy(locators);
+                        var rect = foundElement.Rect;
+                        if (rect.X < 0 || rect.Y < 0)
+                        {
+                            throw new Exception("Element is found but is not visible");
+                        }
+
+                        return foundElement;
+                    }
+                    catch (Exception e)
+                    {
+                        // Might switch to the wrong web context on the first attempt; retry before scrolling down
+                        if (!"NATIVE".Equals(currentContext) && attempt == 1) {
+                            throw new Exception();
+                        }
+
+                        potentialXpathList.Clear();
+                        var source = LoadXMLFromString(driver.PageSource);
+                        source.LoadXml(driver.PageSource);
+                        var elementsByTagName = source.GetElementsByTagName(sourceElement.Name);
+                        foreach (XmlNode itemNode in elementsByTagName)
+                        {
+                            if (itemNode.NodeType != XmlNodeType.Element) continue;
+
+                            var isEqual = compareNodes(sourceElement, itemNode);
+                            if (isEqual)
+                            {
+                                potentialXpathList.Add(Utils.GetXPath(itemNode));
+                            }
+                        }
+
+                        if (!potentialXpathList.IsNullOrEmpty())
+                        {
+                            foreach (var xpath in potentialXpathList)
+                            {
+                                if (sourceElementXpath.ToLower().Equals(xpath.ToLower()))
+                                {
+                                    targetElementXpath = xpath;
+                                    break;
+                                }
+                            }
+
+                            if (targetElementXpath == null)
+                            {
+                                targetElementXpath = potentialXpathList[0];
+                            }
+                        }
+
+                        if (targetElementXpath == null)
+                        {
+                            throw new Exception();
+                        }
+
+                        return FindElementBy(By.XPath(targetElementXpath.Replace(IosXpathRedundantPrefix, "")));
+                    }
+                },
+                (exception, attempt) =>
+                {
+                    Log($"Cannot find touchable element, {Utils.ConvertToOrdinal(attempt)} attempt");
+                    // Might switch to the wrong web context on the first attempt; retry before scrolling down
+                    if (!"NATIVE".Equals(currentContext) && attempt == 1) {
+                        SwitchToWebContext();
+                        return 0;
+                    }
+
+                    if (scrollableElement == null)
+                    {
+                        scrollableElement = FindElementBy(By.XPath((string)infoObject.scrollableElementXpath));
+                        HideKeyboard();
+                    }
+
+                    if (attempt == 1)
+                    {
+                        SwipeToTop(Utils.GetCenterOfElement(scrollableElement));
+                    }
+                    else
+                    {
+                        var center = Utils.GetCenterOfElement(scrollableElement);
+                        var rect = scrollableElement.Rect;
+                        // Fix bug when scrollableElement is out of viewport
+                        if (center.Y > screenSize.Y || rect.Height < 0)
+                        {
+                            center.Y = screenSize.Y / 2;
+                        }
+
+                        DragFromPoint(center, 0, -0.5);
+                    }
+
+                    return 0;
+                }, 5, 3000);
+
+            if (touchableElement == null)
+            {
+                throw new Exception("Cannot find any element on scrollable parent");
+            }
+
+            return touchableElement;
+        }
+
         public bool IsButtonElement(AppiumWebElement element)
         {
             return element.TagName.Contains("Button");
@@ -471,10 +606,10 @@ namespace AppiumTest
                 }
             }
 
-            if (visibleElement != null)
-                return visibleElement;
-            else
+            if (visibleElement == null)
                 throw new Exception($"Cannot find visible web element by: {locatorText}");
+
+            return visibleElement;
         }
 
         public AppiumWebElement FindWebview()
@@ -499,7 +634,7 @@ namespace AppiumTest
         /**
          * Handle event touch element
          */
-        public void TouchOnElementByType(AppiumWebElement element, double relativePointX, double relativePointY)
+        public void TouchOnElement(AppiumWebElement element, double relativePointX, double relativePointY)
         {
             if (IsButtonElement(element))
             {
@@ -529,119 +664,6 @@ namespace AppiumTest
             Log($"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
 
             return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
-        }
-
-        /**
-         * Scroll to find best element to touch
-         */
-        public void TouchOnScrollableElement(By[] locators, string commandId)
-        {
-            var currentCommandId = GetCurrentCommandId();
-            // Temporary disable adding baseCommandId to Appium request to avoid asserting wrong command
-            SetCurrentCommandId(0);
-
-            var infoJsonString = File.ReadAllText($"../../../test/resources/{commandId}.json", Encoding.UTF8);
-            dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
-
-            var sourceElementDoc = new XmlDocument();
-            sourceElementDoc.LoadXml((string)infoObject.touchedElementSource);
-            XmlNode sourceElement = sourceElementDoc.DocumentElement;
-            var screenSize = GetScreenSize();
-            string sourceElementXpath = (string)infoObject.touchedElementXpath;
-
-            AppiumWebElement? scrollableElement = null;
-            var potentialXpathList = new List<string>();
-            string? targetElementXpath = null;
-
-            var touchableElement = Utils.Retry<AppiumWebElement>(
-                (attempt) =>
-                {
-                    try
-                    {
-                        return FindElementBy(null, Config.VisibilityTimeoutInMs, locators);
-                    }
-                    catch (Exception e)
-                    {
-                        potentialXpathList.Clear();
-                        var source = new XmlDocument();
-                        source.LoadXml(driver.PageSource);
-                        var elementsByTagName = source.GetElementsByTagName(sourceElement.Name);
-                        foreach (XmlNode itemNode in elementsByTagName)
-                        {
-                            if (itemNode.NodeType != XmlNodeType.Element) continue;
-
-                            var isEqual = compareNodes(sourceElement, itemNode);
-                            if (isEqual)
-                            {
-                                potentialXpathList.Add(Utils.GetXPathOfNode(itemNode));
-                            }
-                        }
-
-                        if (!potentialXpathList.IsNullOrEmpty())
-                        {
-                            foreach (var xpath in potentialXpathList)
-                            {
-                                if (sourceElementXpath.Equals(xpath))
-                                {
-                                    targetElementXpath = xpath;
-                                    break;
-                                }
-                            }
-
-                            if (targetElementXpath == null)
-                            {
-                                targetElementXpath = potentialXpathList[0];
-                            }
-                        }
-
-                        if (targetElementXpath == null)
-                        {
-                            throw new Exception();
-                        }
-
-                        return FindElementBy(By.XPath(targetElementXpath.Replace(IosXpathRedundantPrefix, "")));
-                    }
-                },
-                (exception, attempt) =>
-                {
-                    Log($"Cannot find touchable element, ${Utils.ConvertToOrdinal(attempt)} attempt");
-                    if (scrollableElement == null)
-                    {
-                        scrollableElement = FindElementBy(By.XPath((string)infoObject.scrollableElementXpath));
-                        HideKeyboard();
-                    }
-
-                    if (attempt == 1)
-                    {
-                        SwipeToTop(Utils.GetCenterOfElement(scrollableElement));
-                    }
-                    else
-                    {
-                        var center = Utils.GetCenterOfElement(scrollableElement);
-                        var rect = scrollableElement.Rect;
-                        // Fix bug when scrollableElement is out of viewport
-                        if (center.Y > screenSize.Y || rect.Height < 0)
-                        {
-                            center.Y = screenSize.Y / 2;
-                        }
-
-                        DragFromPoint(center, 0, -0.5);
-                    }
-
-                    return 0;
-                }, 10, 0);
-
-            if (touchableElement == null)
-            {
-                throw new Exception("Cannot find any element to touch");
-            }
-
-            SetCurrentCommandId(currentCommandId);
-            TouchAtRelativePointOfElement(
-                touchableElement,
-                Double.Parse((string)infoObject.touchedElementRelativeX, CultureInfo.InvariantCulture),
-                Double.Parse((string)infoObject.touchedElementRelativeY, CultureInfo.InvariantCulture)
-            );
         }
 
         /**
@@ -777,9 +799,8 @@ namespace AppiumTest
 
         public void SendKeys(string keys)
         {
-            sleep(Config.SleepTimeBeforeSendKeysInMs);
-
             Log($"Send keys: {keys}");
+            sleep(Config.SleepTimeBeforeSendKeysInMs);
 
             if (isIos)
             {
@@ -971,6 +992,7 @@ namespace AppiumTest
             }
             catch (Exception ignored)
             {
+                Log(ignored.Message);
             }
         }
 
@@ -1142,6 +1164,7 @@ namespace AppiumTest
 
         public void SetCurrentCommandId(long currentCommandId)
         {
+            Log($"Current command: {currentCommandId}");
             if (this.proxy != null)
             {
                 this.proxy.currentCommandId = currentCommandId;
@@ -1208,7 +1231,7 @@ namespace AppiumTest
             return rect;
         }
 
-        public void Log(string str)
+        public void Log(string? str)
         {
             TestContext.Progress.WriteLine(str);
         }
