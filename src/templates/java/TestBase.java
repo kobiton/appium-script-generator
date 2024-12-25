@@ -111,6 +111,7 @@ public class TestBase {
     public void switchToNativeContext() {
         String currentContext = driver.getContext();
         if (NATIVE_CONTEXT.equals(currentContext)) {
+            this.currentContext = NATIVE_CONTEXT;
             return;
         }
 
@@ -410,7 +411,7 @@ public class TestBase {
                     return foundElement;
                 } catch (Exception e) {
                     // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                    if (!"NATIVE".equals(currentContext) && attempt == 1) {
+                    if (!NATIVE_CONTEXT.equals(currentContext) && attempt == 1) {
                         throw new Exception();
                     }
 
@@ -449,7 +450,7 @@ public class TestBase {
             public void handleException(Exception e, int attempt) throws Exception {
                 System.out.println(String.format("Cannot find touchable element on scrollable, %s attempt", Utils.convertToOrdinal(attempt)));
                 // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                if (!"NATIVE".equals(currentContext) && attempt == 1) {
+                if (!NATIVE_CONTEXT.equals(currentContext) && attempt == 1) {
                     switchToWebContext();
                     return;
                 }

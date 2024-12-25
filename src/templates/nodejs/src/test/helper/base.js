@@ -2,9 +2,9 @@ import BPromise from 'bluebird'
 import canvas from 'canvas'
 import axios from 'axios'
 import path from 'path'
-import xPath from 'xpath'
 import get from 'lodash/get'
 import flatten from 'lodash/flatten'
+import isEmpty from 'lodash/isEmpty'
 import {remote} from 'webdriverio'
 import libxmljs from 'libxmljs'
 import fs from 'fs'
@@ -14,7 +14,6 @@ import Rectangle from './rectangle'
 import Point from './point'
 import Config from '../config'
 import {DEVICE_SOURCES, PRESS_TYPES} from './constants'
-import {isEmpty} from 'lodash'
 
 const NATIVE_CONTEXT = 'NATIVE_APP'
 const PLATFORM_NAMES = {
@@ -235,8 +234,7 @@ export default class TestBase {
   }
 
   async calculateNativeRect(webElementRect) {
-    const nativeWebElement = await this.findWebview()
-    let nativeWebElementRect = await this.getRect(nativeWebElement)
+    let webviewRect = await this.getRect(await this.findWebview())
 
     let topToolbarRect
     if (this._isIos) {
@@ -249,75 +247,54 @@ export default class TestBase {
       }
       catch (ignored) {
         // Try more chance by finding the TopBrowserBar in the xml source.
-        const source = await this._driver.getSource()
-        const nativeDocument = this.loadXMLFromString(source)
-
-        const elementXMLNodes = xPath.select('//XCUIElementTypeWebView', nativeDocument)
-        if (elementXMLNodes.length > 0) {
-          const currentElementXMLNode = elementXMLNodes[0]
-
-          let parentElementXMLNode = currentElementXMLNode.parentNode
-          while (parentElementXMLNode) {
-            let firstChildElementXMLNode
-            // Get the first child element node has attributes
-            for (let i = 0; i < parentElementXMLNode.childNodes.length; i++) {
-              const child = parentElementXMLNode.childNodes[i]
-              if (child.attributes) {
-                firstChildElementXMLNode = child
-                break
-              }
+        const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
+        const webviewElement = nativeDocument.get('//XCUIElementTypeWebView')
+        let curElement = webviewElement.parent()
+        while (curElement != null) {
+          const firstChildElement = curElement.childNodes().find((child) => child.type() === 'element')
+          const firstChildRect = new Rectangle(
+            {
+              x: parseInt(firstChildElement.getAttribute("x").value()),
+              y: parseInt(firstChildElement.getAttribute("y").value()),
+              width: parseInt(firstChildElement.getAttribute("width").value()),
+              height: parseInt(firstChildElement.getAttribute("height").value()),
             }
+          )
 
-            if (!firstChildElementXMLNode) continue
-
-            // Translate child's attributes array to an JSON object
-            let attributes = {}
-            for (let attribute of this._o2a(firstChildElementXMLNode.attributes) || []) {
-              attributes[attribute.name] = attribute.value
-            }
-
-            const rect = new Rectangle({
-              x: parseInt(attributes.x),
-              y: parseInt(attributes.y),
-              height: parseInt(attributes.height),
-              width: parseInt(attributes.width)
-            })
-
-            if (!nativeWebElementRect.equals(rect) && nativeWebElementRect.includes(rect)) {
-              topToolbarRect = rect
-              break
-            }
-
-            parentElementXMLNode = parentElementXMLNode.parentNode
+          if (!webviewRect.equals(firstChildRect) && webviewRect.includes(firstChildRect)) {
+            topToolbarRect = firstChildRect
+            break
           }
+
+          curElement = curElement.parent()
         }
       }
     }
 
+    let webViewTop = webviewRect.y
     let deltaHeight = 0
-    let nativeWebElementTop = nativeWebElementRect.y
 
     // Adjust the nativeWebElementRect if there is a top toolbar
     if (topToolbarRect) {
-      nativeWebElementTop = topToolbarRect.y + topToolbarRect.height
-      deltaHeight = nativeWebElementTop - nativeWebElementRect.y
+      webViewTop = topToolbarRect.y + topToolbarRect.height
+      deltaHeight = webViewTop - webviewRect.y
     }
 
-    nativeWebElementRect = new Rectangle({
-      x: nativeWebElementRect.x,
-      y: nativeWebElementTop,
-      height: nativeWebElementRect.height - deltaHeight,
-      width: nativeWebElementRect.width
+    webviewRect = new Rectangle({
+      x: webviewRect.x,
+      y: webViewTop,
+      height: webviewRect.height - deltaHeight,
+      width: webviewRect.width
     })
 
     const nativeRect = new Rectangle({
-      x: nativeWebElementRect.x + webElementRect.x,
-      y: nativeWebElementRect.y + webElementRect.y,
-      height: Math.min(webElementRect.height, nativeWebElementRect.height),
-      width: Math.min(webElementRect.width, nativeWebElementRect.width)
+      x: webviewRect.x + webElementRect.x,
+      y: webviewRect.y + webElementRect.y,
+      height: webElementRect.height,
+      width: webElementRect.width
     })
 
-    this.cropRect(nativeRect, nativeWebElementRect)
+    this.cropRect(nativeRect, webviewRect)
     return nativeRect
   }
 
@@ -392,7 +369,7 @@ export default class TestBase {
     }, async (err, attempt) => {
       console.log(`Cannot find touchable element on scrollable, ${attempt} attempt`)
       // Might switch to the wrong web context on the first attempt; retry before scrolling down
-      if (this._currentContext !== 'NATIVE' && attempt === 1) {
+      if (this._currentContext !== NATIVE_CONTEXT && attempt === 1) {
         await this.switchToWebContext()
         return
       }
@@ -721,7 +698,7 @@ export default class TestBase {
   }
 
   async getSize(element) {
-    return (await this._driver.elementIdSize(element)).value
+    return (await this._driver.elementIdSize(element.ELEMENT)).value
   }
 
   async getAbsolutePoint(relativePointX, relativePointY) {
@@ -1021,95 +998,5 @@ export default class TestBase {
     }
 
     return options
-  }
-
-  _getElementsInXmlDom(xmlDom, selector) {
-    const elementXMLNodes = xPath.select(selector, xmlDom)
-    const elements = elementXMLNodes
-      .map((node) => this._parseXmlNode(xmlDom, this._retinaScale, node))
-      .filter((element) => !!element)
-
-    return elements
-  }
-
-  _parseXmlNode(xmlDOM, xmlScaled, xmlNode) {
-    const recursive = (dom, scale, node, nodeLevel) => {
-
-      // Translate attributes array to an object
-      let attributes = {}
-      for (let attribute of this._o2a(node.attributes) || []) {
-        attributes[attribute.name] = attribute.value
-      }
-
-      attributes['xpath'] = this._getAbsoluteXPath(dom, node)
-      const level = nodeLevel !== undefined ? nodeLevel + 1 : 0
-
-      return {
-        children: [...this._o2a(node.childNodes)]
-          .filter((childNode) => !!childNode.tagName &&
-            !UNUSED_TAG_NAMES.includes(childNode.tagName))
-          .map((childNode, childIndex) => recursive(dom, scale, childNode, level)),
-        tagName: node.tagName,
-        attributes,
-        level,
-        rect: new Rectangle({...attributes, scale})
-      }
-    }
-
-    const element = recursive(xmlDOM, xmlScaled, xmlNode)
-    return element
-  }
-
-  _o2a(o) {
-    const result = []
-    for (let key in o) {
-      if (o.hasOwnProperty(key)) {
-        const n = Number(key)
-        if (!isNaN(n)) {
-          result[n] = o[key]
-        }
-      }
-    }
-
-    return result
-  }
-
-  /**
-   * Get the absolute XPath for a DOMNode
-   * @param {*} domNode {DOMNode}
-   */
-  _getAbsoluteXPath(doc, domNode) {
-    try {
-      // If this isn't an element, we're above the root, return empty string
-      if (!domNode.tagName || domNode.nodeType !== 1) {
-        return ''
-      }
-
-      // Get the relative xpath of this node using tagName
-      let xpath = `/${domNode.tagName}`
-
-      // If this node has siblings of the same tagName, get the index of this node
-      if (domNode.parentNode) {
-        // Get the siblings
-        const childNodes = Array.prototype.slice
-          .call(domNode.parentNode.childNodes, 0)
-          .filter((childNode) => (
-            childNode.nodeType === 1 && childNode.tagName === domNode.tagName
-          ))
-
-        // If there's more than one sibling, append the index
-        if (childNodes.length > 1) {
-          let index = childNodes.indexOf(domNode)
-          xpath += `[${index + 1}]`
-        }
-      }
-
-      // Make a recursive call to this nodes parents and prepend it to this xpath
-      return this._getAbsoluteXPath(doc, domNode.parentNode) + xpath
-    }
-    catch (ign) {
-      // If there's an unexpected exception, abort and don't get an XPath
-      return null
-    }
   }
 }

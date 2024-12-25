@@ -9,7 +9,6 @@
     "@babel/core": "^7.4.0",
     "@babel/preset-env": "7.3.4",
     "@babel/register": "^7.21.0",
-    "@xmldom/xmldom": "^0.8.7",
     "axios": "^1.4.0",
     "bluebird": "^3.5.4",
     "canvas": "^2.11.2",
@@ -18,7 +17,6 @@
     "libxmljs": "^1.0.11",
     "lodash": "^4.17.21",
     "mocha": "^10.2.0",
-    "webdriverio": "4.14.4",
-    "xpath": "0.0.32"
+    "webdriverio": "4.14.4"
   }
 }

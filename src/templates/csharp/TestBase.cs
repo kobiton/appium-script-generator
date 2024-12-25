@@ -96,6 +96,7 @@ namespace AppiumTest
             string currentContext = driver.Context;
             if (NativeContext.Equals(currentContext))
             {
+                currentContext = NativeContext;
                 return;
             }
 
@@ -495,7 +496,7 @@ namespace AppiumTest
                     catch (Exception e)
                     {
                         // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                        if (!"NATIVE".Equals(currentContext) && attempt == 1) {
+                        if (!NativeContext.Equals(currentContext) && attempt == 1) {
                             throw new Exception();
                         }
 
@@ -543,7 +544,7 @@ namespace AppiumTest
                 {
                     Log($"Cannot find touchable element, {Utils.ConvertToOrdinal(attempt)} attempt");
                     // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                    if (!"NATIVE".Equals(currentContext) && attempt == 1) {
+                    if (!NativeContext.Equals(currentContext) && attempt == 1) {
                         SwitchToWebContext();
                         return 0;
                     }
