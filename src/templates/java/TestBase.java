@@ -179,7 +179,6 @@ public class TestBase {
             }
 
             switchContext(bestWebContext);
-            setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
             System.out.println(String.format("Switched to %s web context successfully", bestWebContext));
             return bestWebContext;
         }

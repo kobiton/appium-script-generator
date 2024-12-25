@@ -403,17 +403,38 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'press': {
           const {value, count = 1} = action
-          if (count === 1) {
-            lines.push(new Line(`press(PRESS_TYPES.${value});`))
+          if (context === CONTEXTS.NATIVE) {
+            if (count === 1) {
+              lines.push(new Line(`press(PRESS_TYPES.${value});`))
+            }
+            else {
+              lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+            }
           }
           else {
-            lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+            if (count === 1) {
+              lines.push(new Line('switchToWebContext();'))
+              lines.push(new Line(`press(PRESS_TYPES.${value});`))
+              lines.push(new Line('switchToNativeContext();'))
+            }
+            else {
+              lines.push(new Line('switchToWebContext();'))
+              lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+              lines.push(new Line('switchToNativeContext();'))
+            }
           }
         } break
 
         case 'sendKeys': {
           const {value} = action
-          lines.push(new Line(`sendKeys(${this._getString(value)});`))
+          if (context === CONTEXTS.NATIVE) {
+            lines.push(new Line(`sendKeys(${this._getString(value)});`))
+          }
+          else {
+            lines.push(new Line('switchToWebContext();'))
+            lines.push(new Line(`sendKeys(${this._getString(value)});`))
+            lines.push(new Line('switchToNativeContext();'))
+          }
         } break
 
         case 'sendKeysWithDDT': {

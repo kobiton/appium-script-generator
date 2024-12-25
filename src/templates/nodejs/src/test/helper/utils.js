@@ -1,9 +1,7 @@
 import BPromise from 'bluebird'
 
-const fs = BPromise.promisifyAll(require('fs'))
-
 class Utils {
-  async retry(task, maxAttempts, intervalInMs) {
+  async retry(task, onError, maxAttempts, intervalInMs) {
     maxAttempts = Math.max(maxAttempts, 1)
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -11,6 +9,7 @@ class Utils {
         return await task(attempt)
       }
       catch (e) {
+        onError && await onError(e, attempt)
         if (attempt === maxAttempts) {
           throw e
         }
@@ -37,25 +36,22 @@ class Utils {
     }
   }
 
-  getLocatorText(locators) {
-    return ''
-  }
-
-  /**
-   * Gets file content.
-   * @param  {String} filePath - the path of read file.
-   * @return {String} the file content or Null if file unavailable.
-  */
-  async readFile(filePath, ...options) {
-    try {
-      return fs.readFileAsync(filePath, ...options)
-    }
-    catch (err) {
-      if (err.code === 'ENOENT') {
-        return null
+  getAllText(element) {
+    const texts = []
+    const stack = [element]
+    while (stack.length > 0) {
+      const current = stack.pop()
+      if (current.type() === 'text') {
+        const text = current.text().trim()
+        if (text) texts.push(text)
       }
-      throw err
+      const children = current.childNodes()
+      for (let i = children.length - 1; i >= 0; i--) {
+        stack.push(children[i])
+      }
     }
+
+    return texts.join(' ')
   }
 
   isStatusCodeSuccess(statusCode) {

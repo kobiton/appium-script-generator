@@ -155,30 +155,5 @@ namespace AppiumTest
 
             return finalXpath;
         }
-
-        private static int GetElementIndexInParent(XmlElement element)
-        {
-            XmlNode parentNode = element.ParentNode;
-            if (parentNode == null)
-            {
-                return 0;
-            }
-
-            int index = 1;
-            foreach (XmlNode sibling in parentNode.ChildNodes)
-            {
-                if (sibling == element)
-                {
-                    return parentNode.ChildNodes.Count == 1 ? 0 : index;
-                }
-
-                if (sibling is XmlElement)
-                {
-                    index++;
-                }
-            }
-
-            return 0;
-        }
     }
 }

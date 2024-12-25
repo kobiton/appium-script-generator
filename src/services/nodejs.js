@@ -267,7 +267,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
+            lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
             // eslint-disable-next-line max-len
             lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
           }
@@ -282,16 +282,25 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
         } break
 
         case 'touchOnScrollableParent': {
-          const {elementInfo} = action
-          const {touchedElementRelativeX, touchedElementRelativeY} = elementInfo
+          const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
-          // TODO: due to rush time, we use touchOnElementByType instead
-          // of touchOnScrollableParent temporary
-          const elementVarName = `element${rawLocatorVarName}`
-          // eslint-disable-next-line max-len
-          lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
-          // eslint-disable-next-line max-len
-          lines.push(new Line(`await this.touchOnElementByType(${elementVarName}, ${touchedElementRelativeX}, ${touchedElementRelativeY})`))
+
+          !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
+          if (context === CONTEXTS.NATIVE) {
+            const elementVarName = `element${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`const ${elementVarName} = await this.findElementOnScrollable(${locatorVarName})`))
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
+          }
+          else {
+            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRectOnScrollable(${locatorVarName})`))
+            lines.push(
+              // eslint-disable-next-line max-len
+              new Line(`await this.touchAtPoint(await this.getAbsolutePointOfRect(${x}, ${y}, ${nativeRectVarName}))`))
+          }
         } break
 
         case 'touchAtPoint': {
@@ -306,7 +315,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
             !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
 
             const elementVarName = `element${rawLocatorVarName}`
-            lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
+            lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
 
             const rectVarName = `rect${rawLocatorVarName}`
             lines.push(new Line(`const ${rectVarName} = await this.getRect(${elementVarName})`))
@@ -344,17 +353,38 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'press': {
           const {value, count = 1} = action
-          if (count === 1) {
-            lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+          if (context === CONTEXTS.NATIVE) {
+            if (count === 1) {
+              lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+            }
+            else {
+              lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+            }
           }
           else {
-            lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+            if (count === 1) {
+              lines.push(new Line('await this.switchToWebContext()'))
+              lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+              lines.push(new Line('await this.switchToNativeContext()'))
+            }
+            else {
+              lines.push(new Line('await this.switchToWebContext()'))
+              lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+              lines.push(new Line('await this.switchToNativeContext()'))
+            }
           }
         } break
 
         case 'sendKeys': {
           const {value} = action
-          lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
+          if (context === CONTEXTS.NATIVE) {
+            lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
+          }
+          else {
+            lines.push(new Line('await this.switchToWebContext()'))
+            lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
+            lines.push(new Line('await this.switchToNativeContext()'))
+          }
         } break
 
         case 'sendKeysWithDDT': {

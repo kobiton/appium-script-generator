@@ -192,7 +192,6 @@ namespace AppiumTest
                 }
 
                 SwitchContext(bestWebContext);
-                SetImplicitWaitInMiliSecond(Config.ImplicitWaitInMs);
                 Log($"Switched to {bestWebContext} web context successfully");
                 return bestWebContext;
             }
