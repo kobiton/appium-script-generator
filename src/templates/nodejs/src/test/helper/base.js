@@ -115,6 +115,11 @@ export default class TestBase {
 
     // Find the most webview is usable
     const contexts = await this.getContexts()
+    const hasWebContext = contexts.some((context) => context !== NATIVE_CONTEXT)
+    if (!hasWebContext) {
+      throw new Error(`No web context is available, contexts: ${contexts.join(', ')}`)
+    }
+
     for (const context of contexts) {
       if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
         let source = null
@@ -166,18 +171,18 @@ export default class TestBase {
     if (contextInfos.length !== 0) {
       contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
 
-      let bestWebContext
+      let bestContextInfo
       if (contextInfos[0].matchTextsPercent > 40) {
-        bestWebContext = contextInfos[0].context
+        bestContextInfo = contextInfos[0]
       }
       else {
         contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
-        bestWebContext = contextInfos[0].context
+        bestContextInfo = contextInfos[0]
       }
 
-      await this.switchContext(bestWebContext)
-      console.log(`Switched to ${bestWebContext} web context successfully`)
-      return bestWebContext
+      await this.switchContext(bestContextInfo.context)
+      console.log(`Switched to ${bestContextInfo.context} web context successfully with confident ${bestContextInfo.matchTextsPercent}%`)
+      return bestContextInfo.context
     }
 
     throw new Error('Cannot find any usable web contexts')
@@ -198,12 +203,7 @@ export default class TestBase {
 
   async findWebElementRectOnScrollable(locators) {
     console.log(`Finding web element rectangle on scrollable with locator: ${JSON.stringify(locators)}`)
-    try {
-      await this.switchToWebContext()
-    }
-    catch (ignored) {}
-
-    const foundElement = await this.findElementOnScrollable(locators)
+    const foundElement = await this.findElementOnScrollableInContext(true, locators)
     await this.scrollToWebElement(foundElement)
     const webRect = await this.getWebElementRect(foundElement)
     await this.switchToNativeContext()
@@ -354,14 +354,25 @@ export default class TestBase {
     return await this.findElements(null, Math.max(Config.implicitWaitInMs, timeout), true, locators)
   }
 
-  async findElementOnScrollable(locators) {
+  async findElementOnScrollableInContext(isWebContext, locators) {
     const infoMap = JSON.parse(this.getResourceAsString(`${this.getCurrentCommandId()}.json`))
     let centerOfScrollableElement = null
     let swipedToTop = false
     const touchableElement = await Utils.retry(async (attempt) => {
-      const foundElement = await this.findElementBy(Config.implicitWaitInMs, locators)
+      if (isWebContext && attempt === 1) {
+        await this.switchToWebContext()
+      }
+
+      let foundElement
+      if (isWebContext) {
+        foundElement = await this.findVisibleWebElement(locators)
+      }
+      else {
+        foundElement = await this.findElementBy(Config.implicitWaitInMs, locators)
+      }
+
       const rect = await this.getRect(foundElement)
-      if (rect.x < 0 || rect.y < 0) {
+      if (rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
         throw new Error("Element is found but is not visible")
       }
 
@@ -369,7 +380,9 @@ export default class TestBase {
     }, async (err, attempt) => {
       console.log(`Cannot find touchable element on scrollable, ${attempt} attempt`)
       // Might switch to the wrong web context on the first attempt; retry before scrolling down
-      if (this._currentContext !== NATIVE_CONTEXT && attempt === 1) {
+      if (isWebContext && attempt === 1) {
+        // Wait a bit for web is fully loaded
+        await this.sleep(10000)
         await this.switchToWebContext()
         return
       }
@@ -395,6 +408,10 @@ export default class TestBase {
     }
 
     return touchableElement
+  }
+
+  async findElementOnScrollable(locators) {
+    return await this.findElementOnScrollableInContext(false, locators)
   }
 
   async findVisibleWebElement(locators) {

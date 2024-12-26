@@ -132,6 +132,11 @@ public class TestBase {
         }
 
         Set<String> contexts = driver.getContextHandles();
+        boolean hasWebContext = contexts.stream().anyMatch(context -> !NATIVE_CONTEXT.equals(context));
+        if (!hasWebContext) {
+            System.out.println("No web context is available, contexts: " + String.join(", ", contexts));
+        }
+
         for (String context : contexts) {
             if (context.startsWith("WEBVIEW") || context.equals("CHROMIUM")) {
                 String source = null;
@@ -169,18 +174,18 @@ public class TestBase {
         }
 
         if (!contextInfos.isEmpty()) {
-            String bestWebContext;
+            ContextInfo bestContextInfo;
             contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
             if (contextInfos.get(0).matchTextsPercent > 40) {
-                bestWebContext = contextInfos.get(0).context;
+                bestContextInfo = contextInfos.get(0);
             } else {
                 contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
-                bestWebContext = contextInfos.get(0).context;
+                bestContextInfo = contextInfos.get(0);
             }
 
-            switchContext(bestWebContext);
-            System.out.println(String.format("Switched to %s web context successfully", bestWebContext));
-            return bestWebContext;
+            switchContext(bestContextInfo.context);
+            System.out.println(String.format("Switched to %s web context successfully with confident %s%%", bestContextInfo.context, bestContextInfo.matchTextsPercent));
+            return bestContextInfo.context;
         }
 
         throw new Exception("Cannot find any web context");
@@ -204,11 +209,7 @@ public class TestBase {
 
     public Rectangle findWebElementRectOnScrollable(By... locators) throws Exception {
         System.out.println(String.format("Finding web element rectangle on scrollable with locator: %s", Utils.getLocatorText(locators)));
-        try {
-            switchToWebContext();
-        }
-        catch (Exception ignored) {}
-        MobileElement foundElement = findElementOnScrollable(locators);
+        MobileElement foundElement = findElementOnScrollableInContext(true, locators);
 
         scrollToWebElement(foundElement);
         Rectangle webRectVarName = getWebElementRect(foundElement);
@@ -381,7 +382,7 @@ public class TestBase {
     /**
      * Scroll to find best element on scrollable
      */
-    public MobileElement findElementOnScrollable(By... locators) throws Exception {
+    public MobileElement findElementOnScrollableInContext(boolean isWebContext, By... locators) throws Exception {
         Type type = new TypeToken<Map<String, String>>() {
         }.getType();
         JsonReader reader = new JsonReader(new InputStreamReader(getResourceAsStream(getCurrentCommandId() + ".json")));
@@ -394,9 +395,20 @@ public class TestBase {
 
             @Override
             MobileElement exec(int attempt) throws Exception {
-                MobileElement foundElement = findElementBy(locators);
+                if (isWebContext && attempt == 1) {
+                    switchToWebContext();
+                }
+
+                MobileElement foundElement;
+                if (isWebContext) {
+                    foundElement = findVisibleWebElement(locators);
+                }
+                else {
+                    foundElement = findElementBy(locators);
+                }
+
                 Rectangle rect = foundElement.getRect();
-                if (rect.x < 0 || rect.y < 0) {
+                if (rect.x < 0 || rect.y < 0|| rect.width == 0 || rect.height == 0) {
                     throw new Exception("Element is found but is not visible");
                 }
 
@@ -407,7 +419,9 @@ public class TestBase {
             public void handleException(Exception e, int attempt) throws Exception {
                 System.out.println(String.format("Cannot find touchable element on scrollable, %s attempt", Utils.convertToOrdinal(attempt)));
                 // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                if (!NATIVE_CONTEXT.equals(currentContext) && attempt == 1) {
+                if (isWebContext && attempt == 1) {
+                    // Wait a bit for web is fully loaded
+                    sleep(10000);
                     switchToWebContext();
                     return;
                 }
@@ -438,6 +452,10 @@ public class TestBase {
         }
 
         return touchableElement;
+    }
+
+    public MobileElement findElementOnScrollable(By... locators) throws Exception {
+        return findElementOnScrollableInContext(false, locators);
     }
 
     public boolean isButtonElement(MobileElement element) throws Exception {

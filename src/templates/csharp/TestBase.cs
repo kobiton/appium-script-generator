@@ -129,6 +129,12 @@ namespace AppiumTest
             }
 
             var contexts = driver.Contexts;
+            var hasWebContext = contexts.Any(context => !context.Equals(NativeContext));
+            if (!hasWebContext)
+            {
+                Log("No web context is available, contexts: " + string.Join(", ", contexts));
+            }
+
             foreach (var context in contexts)
             {
                 if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
@@ -179,22 +185,22 @@ namespace AppiumTest
 
             if (!contextInfos.IsNullOrEmpty())
             {
-                string bestWebContext;
+                ContextInfo bestContextInfo;
                 contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
                     (int)(c2.matchTextsPercent - c1.matchTextsPercent));
                 if (contextInfos[0].matchTextsPercent > 40)
                 {
-                    bestWebContext = contextInfos[0].context;
+                    bestContextInfo = contextInfos[0];
                 }
                 else
                 {
                     contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
-                    bestWebContext = contextInfos[0].context;
+                    bestContextInfo = contextInfos[0];
                 }
 
-                SwitchContext(bestWebContext);
-                Log($"Switched to {bestWebContext} web context successfully");
-                return bestWebContext;
+                SwitchContext(bestContextInfo.context);
+                Log($"Switched to {bestContextInfo.context} web context successfully with confident {bestContextInfo.matchTextsPercent}%");
+                return bestContextInfo.context;
             }
 
             throw new Exception("Cannot find any web context");
@@ -232,15 +238,7 @@ namespace AppiumTest
         public Rectangle FindWebElementRectOnScrollable(params By[] locators)
         {
             Log($"Finding web element rectangle on scrollable with locator: {Utils.GetLocatorText(locators)}");
-            try
-            {
-                SwitchToWebContext();
-            }
-            catch (Exception ignored)
-            {
-                Log(ignored.Message);
-            }
-            var foundElement = FindElementOnScrollable(locators);
+            var foundElement = FindElementOnScrollableInContext(true, locators);
 
             ScrollToWebElement(foundElement);
             var webRect = GetWebElementRect(foundElement);
@@ -464,7 +462,7 @@ namespace AppiumTest
         /**
          * Scroll to find best element on scrollable
          */
-        public AppiumWebElement FindElementOnScrollable(params By[] locators)
+        public AppiumWebElement FindElementOnScrollableInContext(bool isWebContext, params By[] locators)
         {
             var infoJsonString = File.ReadAllText($"../../../test/resources/{GetCurrentCommandId()}.json", Encoding.UTF8);
             dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
@@ -475,9 +473,23 @@ namespace AppiumTest
             var touchableElement = Utils.Retry<AppiumWebElement>(
                 (attempt) =>
                 {
-                    var foundElement = FindElementBy(locators);
+                    if (isWebContext && attempt == 1)
+                    {
+                        SwitchToWebContext();
+                    }
+
+                    AppiumWebElement foundElement;
+                    if (isWebContext)
+                    {
+                        foundElement = FindVisibleWebElement(locators);
+                    }
+                    else
+                    {
+                        foundElement = FindElementBy(locators);
+                    }
+
                     var rect = foundElement.Rect;
-                    if (rect.X < 0 || rect.Y < 0)
+                    if (rect.X < 0 || rect.Y < 0 || rect.Width == 0 || rect.Height == 0)
                     {
                         throw new Exception("Element is found but is not visible");
                     }
@@ -488,7 +500,9 @@ namespace AppiumTest
                 {
                     Log($"Cannot find touchable element, {Utils.ConvertToOrdinal(attempt)} attempt");
                     // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                    if (!NativeContext.Equals(currentContext) && attempt == 1) {
+                    if (isWebContext && attempt == 1) {
+                        // Wait a bit for web is fully loaded
+                        sleep(10000);
                         SwitchToWebContext();
                         return 0;
                     }
@@ -526,6 +540,11 @@ namespace AppiumTest
             }
 
             return touchableElement;
+        }
+
+        public AppiumWebElement FindElementOnScrollable(params By[] locators)
+        {
+            return FindElementOnScrollableInContext(false, locators);
         }
 
         public bool IsButtonElement(AppiumWebElement element)
