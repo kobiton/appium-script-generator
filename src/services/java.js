@@ -277,7 +277,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
     for (const step of testSteps) {
       const {
-        id, context, actionJson, selectorConfigurations, isOnKeyboard, findingElementTimeout
+        id, context, actionJson, selectorConfigurations, findingElementTimeout
       } = step
       if (!actionJson) continue
 
@@ -313,7 +313,6 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
         case 'touchOnElement': {
           const {x, y} = action
 
-          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
@@ -334,7 +333,6 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
 
-          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
@@ -353,14 +351,11 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'touchAtPoint': {
           const {x, y} = action
-          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           lines.push(new Line(`touchAtPoint(${x}, ${y});`))
         } break
 
         case 'swipeFromElement': {
           const {x1, y1, x2, y2, duration} = action
-
-          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             /* eslint-disable */
             const elementVarName = `element${rawLocatorVarName}`
@@ -396,8 +391,6 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'swipeByPoints': {
           const {x1, y1, x2, y2, duration} = action
-
-          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           lines.push(new Line(`swipeByPoint(${x1}, ${y1}, ${x2}, ${y2}, ${duration});`))
         } break
 

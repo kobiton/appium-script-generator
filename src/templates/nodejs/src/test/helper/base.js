@@ -80,6 +80,7 @@ export default class TestBase {
   async switchToNativeContext() {
     const context = await this.getContext()
     if (NATIVE_CONTEXT === context) {
+      this._currentContext = NATIVE_CONTEXT
       return
     }
 
@@ -248,7 +249,7 @@ export default class TestBase {
       catch (ignored) {
         // Try more chance by finding the TopBrowserBar in the xml source.
         const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
-        const webviewElement = nativeDocument.get('//XCUIElementTypeWebView')
+        const webviewElement = nativeDocument.get('(//XCUIElementTypeWebView)[1]')
         let curElement = webviewElement.parent()
         while (curElement != null) {
           const firstChildElement = curElement.childNodes().find((child) => child.type() === 'element')
@@ -355,9 +356,9 @@ export default class TestBase {
   }
 
   async findElementOnScrollable(locators) {
-    // TODO implement xml comparison
     const infoMap = JSON.parse(this.getResourceAsString(`${this.getCurrentCommandId()}.json`))
     let centerOfScrollableElement = null
+    let swipedToTop = false
     const touchableElement = await Utils.retry(async (attempt) => {
       const foundElement = await this.findElementBy(Config.implicitWaitInMs, locators)
       const rect = await this.getRect(foundElement)
@@ -380,8 +381,10 @@ export default class TestBase {
         centerOfScrollableElement = this.getCenterOfRect(scrollableRect)
       }
 
-      if (attempt === 1) {
+      if (!swipedToTop) {
+        await this.hideKeyboard()
         await this.swipeToTop(centerOfScrollableElement)
+        swipedToTop = true
       }
       else {
         await this.dragFromPoint(centerOfScrollableElement, 0, -0.5)
@@ -416,7 +419,7 @@ export default class TestBase {
   }
 
   async findWebview() {
-    const xpathSelector = this._isIos ? '//XCUIElementTypeWebView' : '//android.webkit.WebView'
+    const xpathSelector = this._isIos ? '(//XCUIElementTypeWebView)[1]' : '(//android.webkit.WebView)[1]'
     return await this._findElement(null, xpathSelector)
   }
 

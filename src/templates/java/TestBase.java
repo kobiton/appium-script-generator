@@ -28,7 +28,6 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
-import org.jsoup.select.Elements;
 import org.openqa.selenium.*;
 import org.openqa.selenium.interactions.KeyInput;
 import org.openqa.selenium.interactions.Pause;
@@ -249,7 +248,7 @@ public class TestBase {
                 topToolbar = findElementBy(null, 1000, By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
             } catch (Exception ignored) {
                 Document nativeDocument = loadXMLFromString(driver.getPageSource());
-                Element webviewElement = nativeDocument.selectXpath("//XCUIElementTypeWebView").first();
+                Element webviewElement = nativeDocument.selectXpath("(//XCUIElementTypeWebView)[1]").first();
                 Element curElement = webviewElement.parent();
                 while (curElement != null) {
                     Element firstChildElement = curElement.child(0);
@@ -387,63 +386,21 @@ public class TestBase {
         }.getType();
         JsonReader reader = new JsonReader(new InputStreamReader(getResourceAsStream(getCurrentCommandId() + ".json")));
         Map<String, String> infoMap = gson.fromJson(reader, type);
-
-        Document sourceElementDoc = loadXMLFromString(infoMap.get("touchedElementSource"));
-        Element sourceElement = sourceElementDoc.child(0);
         Point screenSize = getScreenSize();
-        String sourceElementXpath = infoMap.get("touchedElementXpath");
 
         MobileElement touchableElement = Utils.retry(new Utils.Task<MobileElement>() {
             private MobileElement scrollableElement;
-            private List<String> potentialXpathList = new ArrayList<>();
-            private String targetElementXpath;
+            private boolean swipedToTop = false;
 
             @Override
             MobileElement exec(int attempt) throws Exception {
-
-                try {
-                    MobileElement foundElement = findElementBy(locators);
-                    Rectangle rect = foundElement.getRect();
-                    if (rect.x < 0 || rect.y < 0) {
-                        throw new Exception("Element is found but is not visible");
-                    }
-
-                    return foundElement;
-                } catch (Exception e) {
-                    // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                    if (!NATIVE_CONTEXT.equals(currentContext) && attempt == 1) {
-                        throw new Exception();
-                    }
-
-                    potentialXpathList.clear();
-                    Document source = loadXMLFromString(driver.getPageSource());
-                    Elements elementsByTagName = source.selectXpath("//" + sourceElement.tagName());
-                    for (Element element : elementsByTagName) {
-                        boolean isEqual = compareNodes(sourceElement, element);
-                        if (isEqual) {
-                            potentialXpathList.add(Utils.getXPath(element));
-                        }
-                    }
-
-                    if (!potentialXpathList.isEmpty()) {
-                        for (String xpath : potentialXpathList) {
-                            if (sourceElementXpath.toLowerCase().equals(xpath.toLowerCase())) {
-                                targetElementXpath = xpath;
-                                break;
-                            }
-                        }
-
-                        if (targetElementXpath == null) {
-                            targetElementXpath = potentialXpathList.get(0);
-                        }
-                    }
-
-                    if (targetElementXpath == null) {
-                        throw new Exception();
-                    }
-
-                    return findElementBy(By.xpath(targetElementXpath.replace(IOS_XPATH_REDUNDANT_PREFIX, "")));
+                MobileElement foundElement = findElementBy(locators);
+                Rectangle rect = foundElement.getRect();
+                if (rect.x < 0 || rect.y < 0) {
+                    throw new Exception("Element is found but is not visible");
                 }
+
+                return foundElement;
             }
 
             @Override
@@ -457,11 +414,12 @@ public class TestBase {
 
                 if (scrollableElement == null) {
                     scrollableElement = findElementBy(By.xpath(infoMap.get("scrollableElementXpath")));
-                    hideKeyboard();
                 }
 
-                if (attempt == 1) {
+                if (!swipedToTop) {
+                    hideKeyboard();
                     swipeToTop(scrollableElement.getCenter());
+                    swipedToTop = true;
                 } else {
                     Point center = scrollableElement.getCenter();
                     Rectangle rect = scrollableElement.getRect();

@@ -96,7 +96,7 @@ namespace AppiumTest
             string currentContext = driver.Context;
             if (NativeContext.Equals(currentContext))
             {
-                currentContext = NativeContext;
+                this.currentContext = NativeContext;
                 return;
             }
 
@@ -296,7 +296,7 @@ namespace AppiumTest
                 catch (Exception ignored)
                 {
                     XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-                    XmlNode webviewNode = nativeDocument.SelectSingleNode("//XCUIElementTypeWebView");
+                    XmlNode webviewNode = nativeDocument.SelectSingleNode("(//XCUIElementTypeWebView)[1]");
                     XmlNode curElement = webviewNode.ParentNode;
 
                     while (curElement != null)
@@ -468,77 +468,21 @@ namespace AppiumTest
         {
             var infoJsonString = File.ReadAllText($"../../../test/resources/{GetCurrentCommandId()}.json", Encoding.UTF8);
             dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
-
-            var sourceElementDoc = new XmlDocument();
-            sourceElementDoc.LoadXml((string)infoObject.touchedElementSource);
-            XmlNode sourceElement = sourceElementDoc.DocumentElement;
-            var screenSize = GetScreenSize();
-            string sourceElementXpath = (string)infoObject.touchedElementXpath;
-
             AppiumWebElement? scrollableElement = null;
-            var potentialXpathList = new List<string>();
-            string? targetElementXpath = null;
+            var swipedToTop = false;
+            var screenSize = GetScreenSize();
 
             var touchableElement = Utils.Retry<AppiumWebElement>(
                 (attempt) =>
                 {
-                    try
+                    var foundElement = FindElementBy(locators);
+                    var rect = foundElement.Rect;
+                    if (rect.X < 0 || rect.Y < 0)
                     {
-                        var foundElement = FindElementBy(locators);
-                        var rect = foundElement.Rect;
-                        if (rect.X < 0 || rect.Y < 0)
-                        {
-                            throw new Exception("Element is found but is not visible");
-                        }
-
-                        return foundElement;
+                        throw new Exception("Element is found but is not visible");
                     }
-                    catch (Exception e)
-                    {
-                        // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                        if (!NativeContext.Equals(currentContext) && attempt == 1) {
-                            throw new Exception();
-                        }
 
-                        potentialXpathList.Clear();
-                        var source = LoadXMLFromString(driver.PageSource);
-                        source.LoadXml(driver.PageSource);
-                        var elementsByTagName = source.GetElementsByTagName(sourceElement.Name);
-                        foreach (XmlNode itemNode in elementsByTagName)
-                        {
-                            if (itemNode.NodeType != XmlNodeType.Element) continue;
-
-                            var isEqual = compareNodes(sourceElement, itemNode);
-                            if (isEqual)
-                            {
-                                potentialXpathList.Add(Utils.GetXPath(itemNode));
-                            }
-                        }
-
-                        if (!potentialXpathList.IsNullOrEmpty())
-                        {
-                            foreach (var xpath in potentialXpathList)
-                            {
-                                if (sourceElementXpath.ToLower().Equals(xpath.ToLower()))
-                                {
-                                    targetElementXpath = xpath;
-                                    break;
-                                }
-                            }
-
-                            if (targetElementXpath == null)
-                            {
-                                targetElementXpath = potentialXpathList[0];
-                            }
-                        }
-
-                        if (targetElementXpath == null)
-                        {
-                            throw new Exception();
-                        }
-
-                        return FindElementBy(By.XPath(targetElementXpath.Replace(IosXpathRedundantPrefix, "")));
-                    }
+                    return foundElement;
                 },
                 (exception, attempt) =>
                 {
@@ -551,13 +495,14 @@ namespace AppiumTest
 
                     if (scrollableElement == null)
                     {
-                        scrollableElement = FindElementBy(By.XPath((string)infoObject.scrollableElementXpath));
-                        HideKeyboard();
+                        scrollableElement = FindElementBy(By.XPath((string) infoObject.scrollableElementXpath));
                     }
 
-                    if (attempt == 1)
+                    if (!swipedToTop)
                     {
+                        HideKeyboard();
                         SwipeToTop(Utils.GetCenterOfElement(scrollableElement));
+                        swipedToTop = true;
                     }
                     else
                     {
@@ -614,7 +559,7 @@ namespace AppiumTest
 
         public AppiumWebElement FindWebview()
         {
-            string className = this.isIos ? "XCUIElementTypeWebView" : "android.webkit.WebView";
+            string className = isIos ? "XCUIElementTypeWebView" : "android.webkit.WebView";
             return driver.FindElement(By.ClassName(className));
         }
 
@@ -1013,12 +958,12 @@ namespace AppiumTest
         {
             if (screenSize == null)
             {
-                byte[] screenshotBytes = ((ITakesScreenshot)driver).GetScreenshot().AsByteArray;
+                byte[] screenshotBytes = ((ITakesScreenshot) driver).GetScreenshot().AsByteArray;
                 var image = SkiaSharp.SKBitmap.Decode(new MemoryStream(screenshotBytes));
                 screenSize = new Point(image.Width, image.Height);
             }
 
-            return (Point)screenSize;
+            return (Point) screenSize;
         }
 
         public Point GetAppOffset()

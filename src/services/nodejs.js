@@ -229,7 +229,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     for (const step of testSteps) {
       const {
-        id, context, actionJson, selectorConfigurations, isOnKeyboard, findingElementTimeout
+        id, context, actionJson, selectorConfigurations, findingElementTimeout
       } = step
       if (!actionJson) continue
 
@@ -285,7 +285,6 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
 
-          !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
@@ -312,8 +311,6 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           const {x1, y1, x2, y2, duration} = action
           if (context === CONTEXTS.NATIVE) {
             /* eslint-disable */
-            !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
-
             const elementVarName = `element${rawLocatorVarName}`
             lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
 
