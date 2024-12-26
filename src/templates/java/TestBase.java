@@ -844,43 +844,6 @@ public class TestBase {
         return getClass().getClassLoader().getResourceAsStream(path);
     }
 
-    protected boolean compareNodes(Element expected, Element actual) {
-        if (!expected.tagName().equals(actual.tagName())) {
-            return false;
-        }
-
-        String[] compareAttrs = new String[]{"label", "text", "visible", "class", "name", "type", "resource-id", "content-desc", "accessibility-id"};
-
-        for (String attrName : compareAttrs) {
-            String v1 = null;
-            String v2 = null;
-            try {
-                v1 = expected.attr(attrName);
-                v2 = actual.attr(attrName);
-            } catch (Exception ignored) {
-            }
-
-            if (v1 != null && v2 != null && !v1.isEmpty() && !v2.isEmpty() && !v1.equals(v2)) {
-                return false;
-            }
-        }
-
-        if (expected.children().size() != actual.children().size()) {
-            return false;
-        }
-
-        for (int i = 0; i < expected.children().size(); i++) {
-            Element expectedChild = expected.child(i);
-            Element actualChild = actual.child(i);
-            boolean isEqual = compareNodes(expectedChild, actualChild);
-            if (!isEqual) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     public Point getCenterOfRect(Rectangle rect) {
         Point center = new Point(rect.x + rect.width / 2, rect.y + rect.height / 2);
         return center;

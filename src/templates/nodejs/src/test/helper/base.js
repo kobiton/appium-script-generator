@@ -240,9 +240,8 @@ export default class TestBase {
     let topToolbarRect
     if (this._isIos) {
       try {
-        const topToolbar = (await this.findElements(null, 1000, false,
-          ["//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"]
-        ))[0]
+        const topToolbar = await this._findElement(null,
+          "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]")
 
         topToolbarRect = await this.getRect(topToolbar)
       }
@@ -637,7 +636,7 @@ export default class TestBase {
   }
 
   async setImplicitWaitInMiliSecond(ms) {
-    return this._driver.timeouts({type: 'implicit', ms})
+    return await this._driver.timeouts({type: 'implicit', ms})
   }
 
   async updateSettings() {
