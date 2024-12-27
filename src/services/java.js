@@ -277,7 +277,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
     for (const step of testSteps) {
       const {
-        id, context, actionJson, selectorConfigurations, isOnKeyboard, findingElementTimeout
+        id, context, actionJson, selectorConfigurations, findingElementTimeout
       } = step
       if (!actionJson) continue
 
@@ -312,27 +312,41 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'touchOnElement': {
           const {x, y} = action
+
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
             lines.push(new Line(`MobileElement ${elementVarName} = findElementBy(${findingElementTimeout}, ${locatorVarName});`))
             // eslint-disable-next-line max-len
-            lines.push(new Line(`touchOnElementByType(${elementVarName}, ${x}, ${y});`))
+            lines.push(new Line(`touchOnElement(${elementVarName}, ${x}, ${y});`))
           }
           else {
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
             // eslint-disable-next-line max-len
-            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${isOnKeyboard}, ${locatorVarName});`))
+            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${locatorVarName});`))
             lines.push(
               new Line(`touchAtPoint(getAbsolutePoint(${x}, ${y}, ${nativeRectVarName}));`))
           }
         } break
 
-        case 'touchOnScrollableElement': {
-          const {elementInfo} = action
+        case 'touchOnScrollableParent': {
+          const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
-          // eslint-disable-next-line max-len
-          lines.push(new Line(`touchOnScrollableElement(${locatorVarName}, "${id}");`))
+
+          if (context === CONTEXTS.NATIVE) {
+            const elementVarName = `element${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`MobileElement ${elementVarName} = findElementOnScrollable(${locatorVarName});`))
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`touchOnElement(${elementVarName}, ${x}, ${y});`))
+          }
+          else {
+            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRectOnScrollable(${locatorVarName});`))
+            lines.push(
+              new Line(`touchAtPoint(getAbsolutePoint(${x}, ${y}, ${nativeRectVarName}));`))
+          }
         } break
 
         case 'touchAtPoint': {
@@ -344,8 +358,6 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           const {x1, y1, x2, y2, duration} = action
           if (context === CONTEXTS.NATIVE) {
             /* eslint-disable */
-            !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
-
             const elementVarName = `element${rawLocatorVarName}`
             lines.push(new Line(`MobileElement ${elementVarName} = findElementBy(${findingElementTimeout}, ${locatorVarName});`))
 
@@ -364,7 +376,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           else {
             /* eslint-disable */
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${isOnKeyboard}, ${locatorVarName});`))
+            lines.push(new Line(`Rectangle ${nativeRectVarName} = findWebElementRect(${locatorVarName});`))
 
             const fromPointVarName = `fromPointOn${rawLocatorVarName}`
             lines.push(new Line(`Point ${fromPointVarName} = getAbsolutePoint(${x1}, ${y1}, ${nativeRectVarName});`))
@@ -383,18 +395,40 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
         } break
 
         case 'press': {
-          const {value, count = 1} = action
-          if (count === 1) {
-            lines.push(new Line(`press(PRESS_TYPES.${value});`))
+          const {value} = action
+          const count = action.count || 1
+          if (context === CONTEXTS.NATIVE) {
+            if (count === 1) {
+              lines.push(new Line(`press(PRESS_TYPES.${value});`))
+            }
+            else {
+              lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+            }
           }
           else {
-            lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+            if (count === 1) {
+              lines.push(new Line('switchToWebContext();'))
+              lines.push(new Line(`press(PRESS_TYPES.${value});`))
+              lines.push(new Line('switchToNativeContext();'))
+            }
+            else {
+              lines.push(new Line('switchToWebContext();'))
+              lines.push(new Line(`pressMultiple(PRESS_TYPES.${value}, ${count});`))
+              lines.push(new Line('switchToNativeContext();'))
+            }
           }
         } break
 
         case 'sendKeys': {
           const {value} = action
-          lines.push(new Line(`sendKeys(${this._getString(value)});`))
+          if (context === CONTEXTS.NATIVE) {
+            lines.push(new Line(`sendKeys(${this._getString(value)});`))
+          }
+          else {
+            lines.push(new Line('switchToWebContext();'))
+            lines.push(new Line(`sendKeys(${this._getString(value)});`))
+            lines.push(new Line('switchToNativeContext();'))
+          }
         } break
 
         case 'sendKeysWithDDT': {

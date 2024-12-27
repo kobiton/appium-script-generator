@@ -2,11 +2,12 @@ import BPromise from 'bluebird'
 import canvas from 'canvas'
 import axios from 'axios'
 import path from 'path'
-import xPath from 'xpath'
 import get from 'lodash/get'
 import flatten from 'lodash/flatten'
+import isEmpty from 'lodash/isEmpty'
 import {remote} from 'webdriverio'
-import {DOMParser} from '@xmldom/xmldom'
+import libxmljs from 'libxmljs'
+import fs from 'fs'
 import Utils from './utils'
 import Proxy from './proxy'
 import Rectangle from './rectangle'
@@ -25,10 +26,6 @@ const MOBILE_CAPABILITY_TYPES = {
   PLATFORM_VERSION: 'platformVersion',
   DEVICE_GROUP: 'deviceGroup'
 }
-
-// Wait a bit for animation to complete
-const SLEEP_AFTER_ACTION = 200
-const fs = BPromise.promisifyAll(require('fs'))
 
 export default class TestBase {
   constructor() {
@@ -78,12 +75,12 @@ export default class TestBase {
     console.log(`Switch to ${context} context`)
     await this._driver.context(context)
     this._currentContext = context
-    await this.sleep(SLEEP_AFTER_ACTION)
   }
 
   async switchToNativeContext() {
     const context = await this.getContext()
     if (NATIVE_CONTEXT === context) {
+      this._currentContext = NATIVE_CONTEXT
       return
     }
 
@@ -101,130 +98,127 @@ export default class TestBase {
   }
 
   async switchToWebContext() {
-    for (let tryTime = 1; tryTime <= 3; tryTime++) {
-      console.log(`Find a web context, ${Utils.convertToOrdinal(tryTime)} time`)
-      const contextInfos = []
+    console.log('Finding a web context')
+    const contextInfos = []
 
-      await this.switchToNativeContext()
-      const source = await this._driver.getSource()
-      const nativeDocument = this.loadXMLFromString(source)
-      const textNodeSelector = this._isIos
-        ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
-      const elements = this._getElementsInXmlDom(nativeDocument, textNodeSelector)
+    await this.switchToNativeContext()
+    const source = await this._driver.getSource()
+    const nativeDocument = this.loadXMLFromString(source)
+    const textNodeSelector = this._isIos
+      ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
+    const nativeTexts = []
+    for (const element of nativeDocument.find(textNodeSelector)) {
+      const textAttr = element.getAttribute(this._isIos ? 'value' : 'text')
+      const textValue = textAttr ? textAttr.value() : ''
+      if (textValue) nativeTexts.push(textValue.trim().toLowerCase())
+    }
 
-      const nativeTexts = []
-      for (const element of elements) {
-        let textAttr = (element.attributes[this._isIos ? 'value' : 'text'] || '')
-        textAttr = textAttr.trim().toLowerCase()
+    // Find the most webview is usable
+    const contexts = await this.getContexts()
+    const hasWebContext = contexts.some((context) => context !== NATIVE_CONTEXT)
+    if (!hasWebContext) {
+      throw new Error(`No web context is available, contexts: ${contexts.join(', ')}`)
+    }
 
-        if (textAttr.length > 0) nativeTexts.push(textAttr)
-      }
-
-      // Find the most webview is usable
-      const contexts = await this.getContexts()
-      for (const context of contexts) {
-        if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
-          let source = null
-          try {
-            await this.switchContext(context)
-            source = await this._driver.getSource()
-          }
-          catch (error) {
-            console.log(`Bad context ${context}, error "${error.message}", skipping...`)
-            continue
-          }
-
-          if (source === null) continue
-
-          let contextInfo = contextInfos.find(e => e.context === context)
-          if (!contextInfo) {
-            contextInfo = {
-              context,
-              sourceLength: source.length,
-              matchTextsPercent: 0
-            }
-
-            contextInfos.push(contextInfo)
-          }
-
-          if (nativeTexts.length === 0) continue
-
-          const htmlDoc = this.loadHtmlFromString(source)
-          const bodyElements = htmlDoc.getElementsByTagName('body')
-          if (bodyElements.length === 0) continue
-
-          const bodyElement = bodyElements[0]
-          let bodyString = (bodyElement.getAttribute('text') || '')
-
-          if (bodyString.length === 0) continue
-          bodyString = bodyString.toLowerCase()
-
-          let matchTexts = 0
-          for (const nativeText of nativeTexts) {
-            if (bodyString.includes(nativeText)) matchTexts++
-          }
-
-          contextInfo.matchTexts = matchTexts
-          contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
-          if (contextInfo.matchTextsPercent >= 80) {
-            break
-          }
+    for (const context of contexts) {
+      if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
+        let source = null
+        try {
+          await this.switchContext(context)
+          source = await this._driver.getSource()
         }
-      }
-
-      if (contextInfos.length !== 0) {
-        contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
-
-        let bestWebContext
-        if (contextInfos[0].matchTextsPercent > 40) {
-          bestWebContext = contextInfos[0].context
-        }
-        else {
-          contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
-          bestWebContext = contextInfos[0].context
+        catch (error) {
+          console.log(`Bad context ${context}, error "${error.message}", skipping...`)
+          continue
         }
 
-        await this.switchContext(bestWebContext)
+        if (source === null) continue
 
-        console.log(`Switched to ${bestWebContext} web context successfully`)
-        return bestWebContext
+        let contextInfo = contextInfos.find(e => e.context === context)
+        if (!contextInfo) {
+          contextInfo = {
+            context,
+            sourceLength: source.length,
+            matchTextsPercent: 0
+          }
+
+          contextInfos.push(contextInfo)
+        }
+
+        if (nativeTexts.length === 0) continue
+
+        const htmlDoc = this.loadHtmlFromString(source)
+        const bodyElement = htmlDoc.get('//body')
+        if (!bodyElement) continue
+
+        let bodyString = Utils.getAllText(bodyElement)
+        if (!bodyString) continue
+        bodyString = bodyString.toLowerCase()
+
+        let matchTexts = 0
+        for (const nativeText of nativeTexts) {
+          if (bodyString.includes(nativeText)) matchTexts++
+        }
+
+        contextInfo.matchTexts = matchTexts
+        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
+        if (contextInfo.matchTextsPercent >= 80) {
+          break
+        }
+      }
+    }
+
+    if (contextInfos.length !== 0) {
+      contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
+
+      let bestContextInfo
+      if (contextInfos[0].matchTextsPercent > 40) {
+        bestContextInfo = contextInfos[0]
+      }
+      else {
+        contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
+        bestContextInfo = contextInfos[0]
       }
 
-      await BPromise.delay(10000)
+      await this.switchContext(bestContextInfo.context)
+      console.log(`Switched to ${bestContextInfo.context} web context successfully with confident ${bestContextInfo.matchTextsPercent}%`)
+      return bestContextInfo.context
     }
 
     throw new Error('Cannot find any usable web contexts')
   }
 
-  async findWebElementRect(isOnKeyboard, locators) {
-    if (isOnKeyboard === false) {
-      await this.hideKeyboard()
-    }
+  async findWebElementRect(locators) {
+    const webElement = await Utils.retry(async (attempt) => {
+      console.log(`Finding web element rectangle attempt ${attempt} with locator: ${JSON.stringify(locators)}`)
+      await this.switchToWebContext()
+      return await this.findVisibleWebElement(locators)
+    }, null, 3, 3000)
 
-    await this.switchToWebContext()
-    const webElement = await this.findVisibleWebElement(locators)
     await this.scrollToWebElement(webElement)
-
     const webElementRect = await this.getWebElementRect(webElement)
-
     await this.switchToNativeContext()
-    const rect = await this.calculateNativeRect(webElementRect)
-    console.log(`Web element rectangle: ${JSON.stringify(rect)}`)
+    return await this.calculateNativeRect(webElementRect)
+  }
 
-    return rect
+  async findWebElementRectOnScrollable(locators) {
+    console.log(`Finding web element rectangle on scrollable with locator: ${JSON.stringify(locators)}`)
+    const foundElement = await this.findElementOnScrollableInContext(true, locators)
+    await this.scrollToWebElement(foundElement)
+    const webRect = await this.getWebElementRect(foundElement)
+    await this.switchToNativeContext()
+    return await this.calculateNativeRect(webRect)
   }
 
   async executeScriptOnWebElement(element, command) {
-    const script = await this.getResourceAsString('execute-script-on-web-element.js')
+    const script = this.getResourceAsString('execute-script-on-web-element.js')
     const res = await this._driver.execute(script, element, command)
-
     return get(res, 'value')
   }
 
   async scrollToWebElement(element) {
     console.log(`Scroll to web element, ${JSON.stringify(element)}`)
     await this.executeScriptOnWebElement(element, 'scrollIntoView')
-    this.sleep(SLEEP_AFTER_ACTION)
   }
 
   async getWebElementRect(element) {
@@ -241,136 +235,188 @@ export default class TestBase {
   }
 
   async calculateNativeRect(webElementRect) {
-    const nativeWebElement = await this.findWebview()
-    if (!nativeWebElement || !nativeWebElement.value) throw new Error('Cannot find any native webview')
-
-    let nativeWebElementRect = await this.getRect(nativeWebElement)
+    let webviewRect = await this.getRect(await this.findWebview())
 
     let topToolbarRect
     if (this._isIos) {
       try {
-        topToolbar = await this.findElement(0,
-          ["//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"]
-        )
+        const topToolbar = await this._findElement(null,
+          "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]")
 
         topToolbarRect = await this.getRect(topToolbar)
       }
       catch (ignored) {
         // Try more chance by finding the TopBrowserBar in the xml source.
-        const source = await this._driver.getSource()
-        const nativeDocument = this.loadXMLFromString(source)
-
-        const elementXMLNodes = xPath.select('//XCUIElementTypeWebView', nativeDocument)
-        if (elementXMLNodes.length > 0) {
-          const currentElementXMLNode = elementXMLNodes[0]
-
-          let parentElementXMLNode = currentElementXMLNode.parentNode
-          while (parentElementXMLNode) {
-            let firstChildElementXMLNode
-            // Get the first child element node has attributes
-            for (let i = 0; i < parentElementXMLNode.childNodes.length; i++) {
-              const child = parentElementXMLNode.childNodes[i]
-              if (child.attributes) {
-                firstChildElementXMLNode = child
-                break
-              }
+        const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
+        const webviewElement = nativeDocument.get('(//XCUIElementTypeWebView)[1]')
+        let curElement = webviewElement.parent()
+        while (curElement != null) {
+          const firstChildElement = curElement.childNodes().find((child) => child.type() === 'element')
+          const firstChildRect = new Rectangle(
+            {
+              x: parseInt(firstChildElement.getAttribute("x").value()),
+              y: parseInt(firstChildElement.getAttribute("y").value()),
+              width: parseInt(firstChildElement.getAttribute("width").value()),
+              height: parseInt(firstChildElement.getAttribute("height").value()),
             }
+          )
 
-            if (!firstChildElementXMLNode) continue
-
-            // Translate child's attributes array to an JSON object
-            let attributes = {}
-            for (let attribute of this._o2a(firstChildElementXMLNode.attributes) || []) {
-              attributes[attribute.name] = attribute.value
-            }
-
-            const rect = new Rectangle({
-              x: parseInt(attributes.x),
-              y: parseInt(attributes.y),
-              height: parseInt(attributes.height),
-              width: parseInt(attributes.width)
-            })
-
-            if (!nativeWebElementRect.equals(rect) && nativeWebElementRect.includes(rect)) {
-              topToolbarRect = rect
-              break
-            }
-
-            parentElementXMLNode = parentElementXMLNode.parentNode
+          if (!webviewRect.equals(firstChildRect) && webviewRect.includes(firstChildRect)) {
+            topToolbarRect = firstChildRect
+            break
           }
+
+          curElement = curElement.parent()
         }
       }
     }
 
+    let webViewTop = webviewRect.y
     let deltaHeight = 0
-    let nativeWebElementTop = nativeWebElementRect.y
 
     // Adjust the nativeWebElementRect if there is a top toolbar
     if (topToolbarRect) {
-      nativeWebElementTop = topToolbarRect.y + topToolbarRect.height
-      deltaHeight = nativeWebElementTop - nativeWebElementRect.y
+      webViewTop = topToolbarRect.y + topToolbarRect.height
+      deltaHeight = webViewTop - webviewRect.y
     }
 
-    nativeWebElementRect = new Rectangle({
-      x: nativeWebElementRect.x,
-      y: nativeWebElementTop,
-      height: nativeWebElementRect.height - deltaHeight,
-      width: nativeWebElementRect.width
+    webviewRect = new Rectangle({
+      x: webviewRect.x,
+      y: webViewTop,
+      height: webviewRect.height - deltaHeight,
+      width: webviewRect.width
     })
 
-    return new Rectangle({
-      x: nativeWebElementRect.x + webElementRect.x,
-      y: nativeWebElementRect.y + webElementRect.y,
-      height: Math.min(webElementRect.height, nativeWebElementRect.height),
-      width: Math.min(webElementRect.width, nativeWebElementRect.width)
+    const nativeRect = new Rectangle({
+      x: webviewRect.x + webElementRect.x,
+      y: webviewRect.y + webElementRect.y,
+      height: webElementRect.height,
+      width: webElementRect.width
     })
+
+    this.cropRect(nativeRect, webviewRect)
+    return nativeRect
   }
 
-  async findElement(timeout, locators) {
-    console.log(`Find element by locators: ${JSON.stringify(locators)}`)
-
-    for (const locator of locators) {
-      try {
-        await this._driver.waitForExist(locator, timeout)
-        const element = await this._driver.element(locator)
-        if (element !== null) return element
-      }
-      catch (ignored) {
-      }
-    }
-
-    throw new Error(`Cannot find element by locators ${JSON.stringify(locators)}}`)
-  }
-
-  async findElements(locators) {
+  async findElements(fromElement, timeout, multiple, locators) {
     console.log(`Find elements by locators: ${JSON.stringify(locators)}`)
+    const notFoundMessage = `Cannot find elements by: ${JSON.stringify(locators)}`
 
-    const result = []
-    for (const locator of locators) {
-      try {
-        const response = await this._driver.elements(locator)
-        if (!response || !response.value) continue
+    if (locators.length === 1) {
+      await this.setImplicitWaitInMiliSecond(timeout)
+      const elements = await this._findElements(null, locators[0])
+      await this.setImplicitWaitInMiliSecond(Config.implicitWaitInMs)
 
-        const elements = response.value
-        if (elements && elements.length > 0) {
-          elements.forEach(element => {
-            if (element) {
-              const isExisting = result.find(e => e.ELEMENT === element.ELEMENT)
-              !isExisting && result.push(element)
+      if (multiple && !isEmpty(elements)) {
+        return elements
+      }
+      else if (!multiple && elements.length === 1) {
+        return elements
+      }
+
+      throw new Error(notFoundMessage)
+    }
+    else {
+      const waitInterval = 5
+      return await Utils.retry(async () => {
+        await this.setImplicitWaitInMiliSecond(0)
+        let elements
+        for (const locator of locators) {
+          try {
+            elements = await this._findElements(null, locator)
+
+            if (multiple && !isEmpty(elements)) {
+              return elements
             }
-          })
+            else if (!multiple && elements.length === 1) {
+              return elements
+            }
+          }
+          catch (ignored) {}
         }
-      }
-      catch (ignored) {
-      }
+
+        await this.setImplicitWaitInMiliSecond(Config.implicitWaitInMs)
+        throw new Error(notFoundMessage)
+      }, null, timeout / (waitInterval * 1000), waitInterval * 1000)
+    }
+  }
+
+  async findElementBy(timeout, locators) {
+    const foundElements = await this.findElements(null, Math.max(Config.implicitWaitInMs, timeout), false, locators)
+    if (!foundElements || foundElements.length !== 1) {
+      throw new Error(`Cannot find element by: ${JSON.stringify(locators)}`)
     }
 
-    return result
+    return foundElements[0]
+  }
+
+  async findElementsBy(timeout, locators) {
+    return await this.findElements(null, Math.max(Config.implicitWaitInMs, timeout), true, locators)
+  }
+
+  async findElementOnScrollableInContext(isWebContext, locators) {
+    const infoMap = JSON.parse(this.getResourceAsString(`${this.getCurrentCommandId()}.json`))
+    let centerOfScrollableElement = null
+    let swipedToTop = false
+    const touchableElement = await Utils.retry(async (attempt) => {
+      if (isWebContext && attempt === 1) {
+        await this.switchToWebContext()
+      }
+
+      let foundElement
+      if (isWebContext) {
+        foundElement = await this.findVisibleWebElement(locators)
+      }
+      else {
+        foundElement = await this.findElementBy(Config.implicitWaitInMs, locators)
+      }
+
+      const rect = await this.getRect(foundElement)
+      if (rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
+        throw new Error("Element is found but is not visible")
+      }
+
+      return foundElement
+    }, async (err, attempt) => {
+      console.log(`Cannot find touchable element on scrollable, ${attempt} attempt`)
+      // Might switch to the wrong web context on the first attempt; retry before scrolling down
+      if (isWebContext && attempt === 1) {
+        // Wait a bit for web is fully loaded
+        await this.sleep(10000)
+        await this.switchToWebContext()
+        return
+      }
+
+      if (centerOfScrollableElement === null) {
+        const scrollableElement = await this._findElement(null, infoMap['scrollableElementXpath'])
+        const scrollableRect = await this.getRect(scrollableElement)
+        centerOfScrollableElement = this.getCenterOfRect(scrollableRect)
+      }
+
+      if (!swipedToTop) {
+        await this.hideKeyboard()
+        await this.swipeToTop(centerOfScrollableElement)
+        swipedToTop = true
+      }
+      else {
+        await this.dragFromPoint(centerOfScrollableElement, 0, -0.5)
+      }
+    }, 5, 3000)
+
+    if (touchableElement === null) {
+      throw new Error('Cannot find any element on scrollable parent')
+    }
+
+    return touchableElement
+  }
+
+  async findElementOnScrollable(locators) {
+    return await this.findElementOnScrollableInContext(false, locators)
   }
 
   async findVisibleWebElement(locators) {
     console.log(`Finding visible web element with locators ${JSON.stringify(locators)}`)
-    const foundElements = await this.findElements(locators)
+    const foundElements = await this.findElementsBy(Config.implicitWaitInMs, locators)
 
     let visibleElement = null
     for (const element of foundElements) {
@@ -389,9 +435,8 @@ export default class TestBase {
   }
 
   async findWebview() {
-    const xpathSelector = this._isIos ? '//XCUIElementTypeWebView' : '//android.webkit.WebView'
-    await this._driver.waitForExist(xpathSelector, Config.explicitWaitInMs)
-    return this._driver.element(xpathSelector)
+    const xpathSelector = this._isIos ? '(//XCUIElementTypeWebView)[1]' : '(//android.webkit.WebView)[1]'
+    return await this._findElement(null, xpathSelector)
   }
 
   /**
@@ -407,7 +452,7 @@ export default class TestBase {
   /**
    * Handle event touch element
    */
-  async touchOnElementByType(element, relativePointX, relativePointY) {
+  async touchOnElement(element, relativePointX, relativePointY) {
     await this.touchAtRelativePointOfElement(element, relativePointX, relativePointY)
   }
 
@@ -451,7 +496,6 @@ export default class TestBase {
     ]
 
     await this._driver.touchPerform(touchPerformSteps)
-    await this.sleep(SLEEP_AFTER_ACTION)
   }
 
   /**
@@ -466,15 +510,53 @@ export default class TestBase {
       {action: 'wait', options: {ms: durationInMs}},
       {action: 'release'}
     ])
+  }
 
-    // Animation on iOS could be longer
-    await this.sleep(this._isIos ? 3000 : SLEEP_AFTER_ACTION)
+  async swipeToTop(fromPoint) {
+    const toPoint = new Point(fromPoint.x, (await this.getScreenSize()).y - 10)
+    console.log(`Swipe to top from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
+    await this.swipeByPoint(fromPoint, toPoint, 100)
+  }
+
+  async dragByPoint(fromPoint, toPoint) {
+    let actions
+    if (this._isIos) {
+      actions = [
+        {action: 'moveTo', x: fromPoint.x, y: fromPoint.y},
+        {action: 'press', x: fromPoint.x, y: fromPoint.y},
+        {action: 'wait', ms: 2000},
+        {action: 'moveTo', x: toPoint.x, y: toPoint.y},
+        {action: 'release'}
+      ]
+    }
+    else {
+      actions = [
+        {action: 'moveTo', x: fromPoint.x, y: fromPoint.y},
+        {action: 'press', x: fromPoint.x, y: fromPoint.y},
+        {action: 'moveTo', x: toPoint.x, y: toPoint.y},
+        {action: 'wait', ms: 300},
+        {action: 'moveTo', x: 0, y: 0},
+        {action: 'release'}
+      ]
+    }
+
+    console.log(`Drag from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
+    await this._driver.touchAction(actions)
+  }
+
+  async dragFromPoint(fromPoint, relativeOffsetX, relativeOffsetY) {
+    const screenSize = await this.getScreenSize()
+    let toX = fromPoint.x + relativeOffsetX * screenSize.x
+    let toY = fromPoint.y + relativeOffsetY * screenSize.y
+    toX = Math.max(toX, 0)
+    toY = Math.max(toY, 0)
+    const toPoint = new Point(toX, toY)
+    return await this.dragByPoint(fromPoint, toPoint)
   }
 
   async sendKeys(keys) {
-    await this.sleep(Config.sleepBeforeSendingKeysInMs)
-
     console.log(`Send keys: ${keys}`)
+    await this.sleep(Config.sleepBeforeSendingKeysInMs)
 
     if (this._isIos) {
       await this._driver.keys(keys)
@@ -489,8 +571,6 @@ export default class TestBase {
 
       await this._driver.actions([{type: 'key', id: 'keyboard', actions}])
     }
-
-    await this.sleep(SLEEP_AFTER_ACTION)
   }
 
   async clearTextField(maxChars) {
@@ -544,8 +624,6 @@ export default class TestBase {
       default:
         throw new Error(`Don't support press ${type} key`)
     }
-
-    await this.sleep(SLEEP_AFTER_ACTION)
   }
 
   async pressMultiple(type, count) {
@@ -569,14 +647,13 @@ export default class TestBase {
 
       console.log('Keyboard is shown, hiding it')
       await this._driver.hideKeyboard()
-      await this.sleep(SLEEP_AFTER_ACTION)
     }
     catch (ignored) {
     }
   }
 
-  setImplicitWaitInMiliSecond(ms) {
-    return this._driver.timeouts({type: 'implicit', ms})
+  async setImplicitWaitInMiliSecond(ms) {
+    return await this._driver.timeouts({type: 'implicit', ms})
   }
 
   async updateSettings() {
@@ -590,7 +667,6 @@ export default class TestBase {
       {bundleId: appId}
     )
 
-    await this.sleep(SLEEP_AFTER_ACTION)
     return response.data.value
   }
 
@@ -611,8 +687,7 @@ export default class TestBase {
     if (!this._isIos) return new Point(0, 0)
 
     try {
-      const rootElement = await this._driver.element(
-        '//XCUIElementTypeApplication | //XCUIElementTypeOther')
+      const rootElement = await this._findElement(null, '//XCUIElementTypeApplication | //XCUIElementTypeOther')
       const rootElementSize = await this.getSize(rootElement)
       const screenSize = await this.getScreenSize()
       const screenWidthScaled = screenSize.x / this._retinaScale
@@ -637,13 +712,12 @@ export default class TestBase {
   }
 
   async getRect(element) {
-    console.log(`Get rect of element: ${JSON.stringify(element)}`)
-    const rectInJson = (await this._driver.elementIdRect(element.value.ELEMENT)).value
+    const rectInJson = (await this._driver.elementIdRect(element.ELEMENT)).value
     return new Rectangle(rectInJson)
   }
 
   async getSize(element) {
-    return (await this._driver.elementIdSize(element.value.ELEMENT)).value
+    return (await this._driver.elementIdSize(element.ELEMENT)).value
   }
 
   async getAbsolutePoint(relativePointX, relativePointY) {
@@ -676,16 +750,16 @@ export default class TestBase {
   }
 
   loadXMLFromString(xmlString) {
-    return (new DOMParser()).parseFromString(xmlString, 'text/xml')
+    return libxmljs.parseXml(xmlString)
   }
 
   loadHtmlFromString(htmlString) {
-    return (new DOMParser()).parseFromString(htmlString, 'text/html')
+    return libxmljs.parseHtml(htmlString)
   }
 
-  async getResourceAsString(resourceName) {
+  getResourceAsString(resourceName) {
     const resourcePath = path.join(__dirname, '../..', 'resources', resourceName)
-    return Utils.readFile(resourcePath, 'utf8')
+    return fs.readFileSync(resourcePath, 'utf8')
   }
 
   compareNodes(expected, actual) {
@@ -830,6 +904,28 @@ export default class TestBase {
     return url
   }
 
+  cropRect(rect, boundRect) {
+    if (rect.x < boundRect.x) {
+      rect.x = boundRect.x
+    } else if (rect.x > boundRect.x + boundRect.width) {
+      rect.x = boundRect.x + boundRect.width
+    }
+
+    if (rect.y < boundRect.y) {
+      rect.y = boundRect.y
+    } else if (rect.y > boundRect.y + boundRect.height) {
+      rect.y = boundRect.y + boundRect.height
+    }
+
+    if (rect.x + rect.width > boundRect.x + boundRect.width) {
+      rect.width = boundRect.x + boundRect.width - rect.x
+    }
+
+    if (rect.y + rect.height > boundRect.y + boundRect.height) {
+      rect.height = boundRect.y + boundRect.height - rect.y
+    }
+  }
+
   async saveDebugResource(options = {}) {
     let {source, screenshot} = options
 
@@ -842,20 +938,19 @@ export default class TestBase {
       const debugDir = path.join(rootDir, 'debug', debugDirName)
 
       console.log(`Save source & screenshot for debugging at ${debugDir}`)
-      await fs.mkdirAsync(debugDir, {recursive: true})
+      fs.mkdirSync(debugDir, {recursive: true})
 
       if (!source) {
         source = await this._driver.getSource()
       }
 
-      await fs.writeFileAsync(path.join(debugDir, 'source.xml'), source, 'utf8')
+      fs.writeFileSync(path.join(debugDir, 'source.xml'), source, 'utf8')
 
       if (!screenshot) {
         screenshot = (await this._driver.screenshot()).value
       }
 
-      await fs.writeFileAsync(
-        path.join(debugDir, 'screenshot.png'), screenshot, {encoding: 'base64'})
+      fs.writeFileSync(path.join(debugDir, 'screenshot.png'), screenshot, {encoding: 'base64'})
     }
     catch (error) {
       console.error(error)
@@ -871,9 +966,44 @@ export default class TestBase {
   }
 
   setCurrentCommandId(currentCommandId) {
+    console.log(`Current command: ${currentCommandId}`)
     if (this._proxy != null) {
       this._proxy.currentCommandId = currentCommandId
     }
+  }
+
+  async _findElements(fromElement, locator) {
+    let result
+    if (fromElement) {
+      result = await fromElement.$$(locator)
+    }
+    else {
+      result = await this._driver.elements(locator)
+    }
+
+    result = result.value
+    if (isEmpty(result)) {
+      throw new Error(`Cannot find elements with with locator: ${locator}`)
+    }
+
+    return result
+  }
+
+  async _findElement(fromElement, locator) {
+    let result
+    if (fromElement) {
+      result = await fromElement.$(locator)
+    }
+    else {
+      result = await this._driver.element(locator)
+    }
+
+    result = result.value
+    if (isEmpty(result)) {
+      throw new Error(`Cannot find element with with locator: ${locator}`)
+    }
+
+    return result
   }
 
   _buildOptions(desiredCaps) {
@@ -887,95 +1017,5 @@ export default class TestBase {
     }
 
     return options
-  }
-
-  _getElementsInXmlDom(xmlDom, selector) {
-    const elementXMLNodes = xPath.select(selector, xmlDom)
-    const elements = elementXMLNodes
-      .map((node) => this._parseXmlNode(xmlDom, this._retinaScale, node))
-      .filter((element) => !!element)
-
-    return elements
-  }
-
-  _parseXmlNode(xmlDOM, xmlScaled, xmlNode) {
-    const recursive = (dom, scale, node, nodeLevel) => {
-
-      // Translate attributes array to an object
-      let attributes = {}
-      for (let attribute of this._o2a(node.attributes) || []) {
-        attributes[attribute.name] = attribute.value
-      }
-
-      attributes['xpath'] = this._getAbsoluteXPath(dom, node)
-      const level = nodeLevel !== undefined ? nodeLevel + 1 : 0
-
-      return {
-        children: [...this._o2a(node.childNodes)]
-          .filter((childNode) => !!childNode.tagName &&
-            !UNUSED_TAG_NAMES.includes(childNode.tagName))
-          .map((childNode, childIndex) => recursive(dom, scale, childNode, level)),
-        tagName: node.tagName,
-        attributes,
-        level,
-        rect: new Rectangle({...attributes, scale})
-      }
-    }
-
-    const element = recursive(xmlDOM, xmlScaled, xmlNode)
-    return element
-  }
-
-  _o2a(o) {
-    const result = []
-    for (let key in o) {
-      if (o.hasOwnProperty(key)) {
-        const n = Number(key)
-        if (!isNaN(n)) {
-          result[n] = o[key]
-        }
-      }
-    }
-
-    return result
-  }
-
-  /**
-   * Get the absolute XPath for a DOMNode
-   * @param {*} domNode {DOMNode}
-   */
-  _getAbsoluteXPath(doc, domNode) {
-    try {
-      // If this isn't an element, we're above the root, return empty string
-      if (!domNode.tagName || domNode.nodeType !== 1) {
-        return ''
-      }
-
-      // Get the relative xpath of this node using tagName
-      let xpath = `/${domNode.tagName}`
-
-      // If this node has siblings of the same tagName, get the index of this node
-      if (domNode.parentNode) {
-        // Get the siblings
-        const childNodes = Array.prototype.slice
-          .call(domNode.parentNode.childNodes, 0)
-          .filter((childNode) => (
-            childNode.nodeType === 1 && childNode.tagName === domNode.tagName
-          ))
-
-        // If there's more than one sibling, append the index
-        if (childNodes.length > 1) {
-          let index = childNodes.indexOf(domNode)
-          xpath += `[${index + 1}]`
-        }
-      }
-
-      // Make a recursive call to this nodes parents and prepend it to this xpath
-      return this._getAbsoluteXPath(doc, domNode.parentNode) + xpath
-    }
-    catch (ign) {
-      // If there's an unexpected exception, abort and don't get an XPath
-      return null
-    }
   }
 }

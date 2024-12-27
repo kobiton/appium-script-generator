@@ -229,7 +229,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     for (const step of testSteps) {
       const {
-        id, context, actionJson, selectorConfigurations, isOnKeyboard, findingElementTimeout
+        id, context, actionJson, selectorConfigurations, findingElementTimeout
       } = step
       if (!actionJson) continue
 
@@ -267,31 +267,39 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
+            lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
             // eslint-disable-next-line max-len
-            lines.push(new Line(`await this.touchOnElementByType(${elementVarName}, ${x}, ${y})`))
+            lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
           }
           else {
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
             // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${isOnKeyboard}, ${locatorVarName})`))
+            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${locatorVarName})`))
             lines.push(
               // eslint-disable-next-line max-len
               new Line(`await this.touchAtPoint(await this.getAbsolutePointOfRect(${x}, ${y}, ${nativeRectVarName}))`))
           }
         } break
 
-        case 'touchOnScrollableElement': {
-          const {elementInfo} = action
-          const {touchedElementRelativeX, touchedElementRelativeY} = elementInfo
+        case 'touchOnScrollableParent': {
+          const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
-          // TODO: due to rush time, we use touchOnElementByType instead
-          // of touchOnScrollableElement temporary
-          const elementVarName = `element${rawLocatorVarName}`
-          // eslint-disable-next-line max-len
-          lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
-          // eslint-disable-next-line max-len
-          lines.push(new Line(`await this.touchOnElementByType(${elementVarName}, ${touchedElementRelativeX}, ${touchedElementRelativeY})`))
+
+          if (context === CONTEXTS.NATIVE) {
+            const elementVarName = `element${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`const ${elementVarName} = await this.findElementOnScrollable(${locatorVarName})`))
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
+          }
+          else {
+            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
+            // eslint-disable-next-line max-len
+            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRectOnScrollable(${locatorVarName})`))
+            lines.push(
+              // eslint-disable-next-line max-len
+              new Line(`await this.touchAtPoint(await this.getAbsolutePointOfRect(${x}, ${y}, ${nativeRectVarName}))`))
+          }
         } break
 
         case 'touchAtPoint': {
@@ -303,10 +311,8 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           const {x1, y1, x2, y2, duration} = action
           if (context === CONTEXTS.NATIVE) {
             /* eslint-disable */
-            !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
-
             const elementVarName = `element${rawLocatorVarName}`
-            lines.push(new Line(`const ${elementVarName} = await this.findElement(${findingElementTimeout}, ${locatorVarName})`))
+            lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
 
             const rectVarName = `rect${rawLocatorVarName}`
             lines.push(new Line(`const ${rectVarName} = await this.getRect(${elementVarName})`))
@@ -323,7 +329,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           else {
             /* eslint-disable */
             const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${isOnKeyboard}, ${locatorVarName})`))
+            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${locatorVarName})`))
 
             const fromPointVarName = `fromPointOn${rawLocatorVarName}`
             lines.push(new Line(`const ${fromPointVarName} = await this.getAbsolutePointOfRect(${x1}, ${y1}, ${nativeRectVarName})`))
@@ -343,18 +349,40 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
         } break
 
         case 'press': {
-          const {value, count = 1} = action
-          if (count === 1) {
-            lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+          const {value} = action
+          const count = action.count || 1
+          if (context === CONTEXTS.NATIVE) {
+            if (count === 1) {
+              lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+            }
+            else {
+              lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+            }
           }
           else {
-            lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+            if (count === 1) {
+              lines.push(new Line('await this.switchToWebContext()'))
+              lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
+              lines.push(new Line('await this.switchToNativeContext()'))
+            }
+            else {
+              lines.push(new Line('await this.switchToWebContext()'))
+              lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
+              lines.push(new Line('await this.switchToNativeContext()'))
+            }
           }
         } break
 
         case 'sendKeys': {
           const {value} = action
-          lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
+          if (context === CONTEXTS.NATIVE) {
+            lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
+          }
+          else {
+            lines.push(new Line('await this.switchToWebContext()'))
+            lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
+            lines.push(new Line('await this.switchToNativeContext()'))
+          }
         } break
 
         case 'sendKeysWithDDT': {

@@ -1,33 +1,17 @@
 export default class Rectangle {
   constructor({x, y, width, height, scale = null}) {
-    this._x = x
-    this._y = y
-    this._width = width
-    this._height = height
+    this.x = x
+    this.y = y
+    this.width = width
+    this.height = height
 
     if (scale) {
-      this._scale = scale
-      this._x = Math.floor(this._x * scale)
-      this._y = Math.floor(this._y * scale)
-      this._width = Math.floor(this._width * scale)
-      this._height = Math.floor(this._height * scale)
+      this.scale = scale
+      this.x = Math.floor(this.x * scale)
+      this.y = Math.floor(this.y * scale)
+      this.width = Math.floor(this.width * scale)
+      this.height = Math.floor(this.height * scale)
     }
-  }
-
-  get x() {
-    return this._x
-  }
-
-  get y() {
-    return this._y
-  }
-
-  get width() {
-    return this._width
-  }
-
-  get height() {
-    return this._height
   }
 
   equals(rect) {

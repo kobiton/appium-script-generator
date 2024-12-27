@@ -5,13 +5,9 @@ import Config from '../config'
 
 export default class Proxy {
   constructor() {
-    this._currentCommandId = 0
+    this.currentCommandId = 0
     this._proxy = null
     this._listeningPort = 0
-  }
-
-  set currentCommandId(value) {
-    this._currentCommandId = value
   }
 
   async start() {
@@ -22,7 +18,7 @@ export default class Proxy {
 
     const server = http.createServer((req, res) => {
       const url = new URL(`${this.getServerUrl()}${req.url}`)
-      this._currentCommandId && url.searchParams.set('baseCommandId', this._currentCommandId)
+      this.currentCommandId && url.searchParams.set('baseCommandId', this.currentCommandId)
       req.url = url.toString().replace(this.getServerUrl(), '')
       this._proxy.web(req, res, {
         target: Config.appiumServerUrl,

@@ -1,5 +1,6 @@
 package com.kobiton.scriptlessautomation;
 
+import org.jsoup.nodes.Element;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Rectangle;
 
@@ -20,6 +21,44 @@ public class Utils {
         }
 
         return null;
+    }
+
+    public static String getXPath(Element element) {
+        StringBuilder xpath = new StringBuilder();
+
+        while (element != null) {
+            String tagName = element.tagName();
+            int index = 1;
+
+            for (Element sibling = element.previousElementSibling(); sibling != null; sibling = sibling.previousElementSibling()) {
+                if (sibling.tagName().equals(tagName)) {
+                    index++;
+                }
+            }
+
+            boolean hasMultipleSiblings = false;
+            for (Element sibling = element.nextElementSibling(); sibling != null; sibling = sibling.nextElementSibling()) {
+                if (sibling.tagName().equals(tagName)) {
+                    hasMultipleSiblings = true;
+                    break;
+                }
+            }
+
+            if (index > 1 || hasMultipleSiblings) {
+                xpath.insert(0, "/" + tagName + "[" + index + "]");
+            } else {
+                xpath.insert(0, "/" + tagName);
+            }
+
+            element = element.parent();
+        }
+
+        String finalXpath = xpath.toString();
+        if (finalXpath.startsWith("/#root")) {
+            finalXpath = finalXpath.substring("/#root".length());
+        }
+
+        return finalXpath;
     }
 
     public static String convertToOrdinal(int i) {
@@ -47,7 +86,7 @@ public class Utils {
     }
 
     public static boolean isRectangleInclude(Rectangle rect1, Rectangle rect2) {
-        return rect1.x <= rect2.x && 
+        return rect1.x <= rect2.x &&
             rect1.y <= rect2.y &&
             rect1.x + rect1.width >= rect2.x + rect2.width &&
             rect1.y + rect1.height >= rect2.y + rect2.height;
