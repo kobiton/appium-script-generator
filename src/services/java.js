@@ -395,7 +395,8 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
         } break
 
         case 'press': {
-          const {value, count = 1} = action
+          const {value} = action
+          const count = action.count || 1
           if (context === CONTEXTS.NATIVE) {
             if (count === 1) {
               lines.push(new Line(`press(PRESS_TYPES.${value});`))

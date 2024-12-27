@@ -308,7 +308,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
             lines.push(new Line(`AppiumWebElement ${elementVarName} = FindElementOnScrollable(${locatorVarName});`))
-            // eslint-disable-next-line max-len
             lines.push(new Line(`TouchOnElement(${elementVarName}, ${x}, ${y});`))
           }
           else {
@@ -366,7 +365,8 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
         } break
 
         case 'press': {
-          const {value, count = 1} = action
+          const {value} = action
+          const count = action.count || 1
           if (context === CONTEXTS.NATIVE) {
             if (count === 1) {
               lines.push(new Line(`Press(PressTypes.${upperFirst(camelCase(value))});`))
