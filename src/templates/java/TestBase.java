@@ -195,7 +195,7 @@ public class TestBase {
 
                 throw new Exception("Cannot find any web context");
             }
-        }, 3, 10000);
+        }, 4, 10000);
     }
 
     public Rectangle findWebElementRect(By... locators) throws Exception {
