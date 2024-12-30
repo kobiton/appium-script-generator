@@ -193,7 +193,7 @@ export default class TestBase {
     return await Utils.retry(async (attempt) => {
       console.log(`Finding a web context attempt ${attempt}`)
       await this.switchToWebContextCore()
-    }, 4, 10000)
+    }, null, 4, 10000)
   }
 
   async findWebElementRect(locators) {
