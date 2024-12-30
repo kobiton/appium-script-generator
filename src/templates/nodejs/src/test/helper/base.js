@@ -97,98 +97,102 @@ export default class TestBase {
     return get(response, 'value')
   }
 
+  async switchToWebContextCore() {
+    const contextInfos = []
+
+    await this.switchToNativeContext()
+    const source = await this._driver.getSource()
+    const nativeDocument = this.loadXMLFromString(source)
+    const textNodeSelector = this._isIos
+      ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
+    const nativeTexts = []
+    for (const element of nativeDocument.find(textNodeSelector)) {
+      const textAttr = element.getAttribute(this._isIos ? 'value' : 'text')
+      const textValue = textAttr ? textAttr.value() : ''
+      if (textValue) nativeTexts.push(textValue.trim().toLowerCase())
+    }
+
+    // Find the most webview is usable
+    const contexts = await this.getContexts()
+    const hasWebContext = contexts.some((context) => context !== NATIVE_CONTEXT)
+    if (!hasWebContext) {
+      throw new Error(`No web context is available, contexts: ${contexts.join(', ')}`)
+    }
+
+    for (const context of contexts) {
+      if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
+        let source = null
+        try {
+          await this.switchContext(context)
+          source = await this._driver.getSource()
+        }
+        catch (error) {
+          console.log(`Bad context ${context}, error "${error.message}", skipping...`)
+          continue
+        }
+
+        if (source === null) continue
+
+        let contextInfo = contextInfos.find(e => e.context === context)
+        if (!contextInfo) {
+          contextInfo = {
+            context,
+            sourceLength: source.length,
+            matchTextsPercent: 0
+          }
+
+          contextInfos.push(contextInfo)
+        }
+
+        if (nativeTexts.length === 0) continue
+
+        const htmlDoc = this.loadHtmlFromString(source)
+        const bodyElement = htmlDoc.get('//body')
+        if (!bodyElement) continue
+
+        let bodyString = Utils.getAllText(bodyElement)
+        if (!bodyString) continue
+        bodyString = bodyString.toLowerCase()
+
+        let matchTexts = 0
+        for (const nativeText of nativeTexts) {
+          if (bodyString.includes(nativeText)) matchTexts++
+        }
+
+        contextInfo.matchTexts = matchTexts
+        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
+        if (contextInfo.matchTextsPercent >= 80) {
+          break
+        }
+      }
+    }
+
+    if (contextInfos.length !== 0) {
+      contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
+
+      let bestContextInfo
+      if (contextInfos[0].matchTextsPercent > 40) {
+        bestContextInfo = contextInfos[0]
+      }
+      else {
+        contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
+        bestContextInfo = contextInfos[0]
+      }
+
+      await this.switchContext(bestContextInfo.context)
+      console.log(`Switched to ${bestContextInfo.context} web context successfully with confident ${bestContextInfo.matchTextsPercent}%`)
+      return bestContextInfo.context
+    }
+
+    throw new Error('Cannot find any usable web contexts')
+  }
+
   async switchToWebContext() {
     // Some web page is very slow to load (up to 30s),
     // and there is no web context until it finish loading
     return await Utils.retry(async (attempt) => {
       console.log(`Finding a web context attempt ${attempt}`)
-      const contextInfos = []
-
-      await this.switchToNativeContext()
-      const source = await this._driver.getSource()
-      const nativeDocument = this.loadXMLFromString(source)
-      const textNodeSelector = this._isIos
-        ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
-      const nativeTexts = []
-      for (const element of nativeDocument.find(textNodeSelector)) {
-        const textAttr = element.getAttribute(this._isIos ? 'value' : 'text')
-        const textValue = textAttr ? textAttr.value() : ''
-        if (textValue) nativeTexts.push(textValue.trim().toLowerCase())
-      }
-
-      // Find the most webview is usable
-      const contexts = await this.getContexts()
-      const hasWebContext = contexts.some((context) => context !== NATIVE_CONTEXT)
-      if (!hasWebContext) {
-        throw new Error(`No web context is available, contexts: ${contexts.join(', ')}`)
-      }
-
-      for (const context of contexts) {
-        if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
-          let source = null
-          try {
-            await this.switchContext(context)
-            source = await this._driver.getSource()
-          }
-          catch (error) {
-            console.log(`Bad context ${context}, error "${error.message}", skipping...`)
-            continue
-          }
-
-          if (source === null) continue
-
-          let contextInfo = contextInfos.find(e => e.context === context)
-          if (!contextInfo) {
-            contextInfo = {
-              context,
-              sourceLength: source.length,
-              matchTextsPercent: 0
-            }
-
-            contextInfos.push(contextInfo)
-          }
-
-          if (nativeTexts.length === 0) continue
-
-          const htmlDoc = this.loadHtmlFromString(source)
-          const bodyElement = htmlDoc.get('//body')
-          if (!bodyElement) continue
-
-          let bodyString = Utils.getAllText(bodyElement)
-          if (!bodyString) continue
-          bodyString = bodyString.toLowerCase()
-
-          let matchTexts = 0
-          for (const nativeText of nativeTexts) {
-            if (bodyString.includes(nativeText)) matchTexts++
-          }
-
-          contextInfo.matchTexts = matchTexts
-          contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
-          if (contextInfo.matchTextsPercent >= 80) {
-            break
-          }
-        }
-      }
-
-      if (contextInfos.length !== 0) {
-        contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
-
-        let bestContextInfo
-        if (contextInfos[0].matchTextsPercent > 40) {
-          bestContextInfo = contextInfos[0]
-        }
-        else {
-          contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
-          bestContextInfo = contextInfos[0]
-        }
-
-        await this.switchContext(bestContextInfo.context)
-        console.log(`Switched to ${bestContextInfo.context} web context successfully with confident ${bestContextInfo.matchTextsPercent}%`)
-        return bestContextInfo.context
-      }
-
-      throw new Error('Cannot find any usable web contexts')
+      await this.switchToWebContextCore()
     }, 4, 10000)
   }
 

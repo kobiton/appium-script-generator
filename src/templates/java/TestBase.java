@@ -117,6 +117,79 @@ public class TestBase {
         switchContext(NATIVE_CONTEXT);
     }
 
+    public String switchToWebContextCore() throws Exception {
+        List<ContextInfo> contextInfos = new ArrayList<>();
+
+        switchToNativeContext();
+        Document nativeDocument = loadXMLFromString(driver.getPageSource());
+        String textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
+        List<String> nativeTexts = new ArrayList<>();
+        for (Element textElement : nativeDocument.selectXpath(textNodeSelector)) {
+            String textAttr = textElement.attr(isIos ? "value" : "text");
+            textAttr = textAttr.trim().toLowerCase();
+            if (!textAttr.isEmpty()) nativeTexts.add(textAttr);
+        }
+
+        Set<String> contexts = driver.getContextHandles();
+        boolean hasWebContext = contexts.stream().anyMatch(context -> !NATIVE_CONTEXT.equals(context));
+        if (!hasWebContext) {
+            System.out.println("No web context is available, contexts: " + String.join(", ", contexts));
+        }
+
+        for (String context : contexts) {
+            if (context.startsWith("WEBVIEW") || context.equals("CHROMIUM")) {
+                String source = null;
+                try {
+                    switchContext(context);
+                    source = driver.getPageSource();
+                } catch (Exception ex) {
+                    System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
+                    continue;
+                }
+
+                if (source == null) continue;
+                ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
+                if (contextInfo == null) {
+                    contextInfo = new ContextInfo(context);
+                    contextInfos.add(contextInfo);
+                }
+
+                contextInfo.sourceLength = source.length();
+                if (nativeTexts.isEmpty()) continue;
+
+                Document htmlDoc = loadXMLFromString(source);
+                String bodyString = htmlDoc.select("body").text().toLowerCase();
+                long matchTexts = 0;
+                for (String nativeText : nativeTexts) {
+                    if (bodyString.contains(nativeText)) matchTexts++;
+                }
+
+                contextInfo.matchTexts = matchTexts;
+                contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.size();
+                if (contextInfo.matchTextsPercent >= 80) {
+                    break;
+                }
+            }
+        }
+
+        if (!contextInfos.isEmpty()) {
+            ContextInfo bestContextInfo;
+            contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
+            if (contextInfos.get(0).matchTextsPercent > 40) {
+                bestContextInfo = contextInfos.get(0);
+            } else {
+                contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
+                bestContextInfo = contextInfos.get(0);
+            }
+
+            switchContext(bestContextInfo.context);
+            System.out.println(String.format("Switched to %s web context successfully with confident %s%%", bestContextInfo.context, bestContextInfo.matchTextsPercent));
+            return bestContextInfo.context;
+        }
+
+        throw new Exception("Cannot find any web context");
+    }
+
     public String switchToWebContext() throws Exception {
         // Some web page is very slow to load (up to 30s),
         // and there is no web context until it finish loading
@@ -124,76 +197,7 @@ public class TestBase {
             @Override
             String exec(int attempt) throws Exception {
                 System.out.println(String.format("Finding a web context %s attempt", Utils.convertToOrdinal(attempt)));
-                List<ContextInfo> contextInfos = new ArrayList<>();
-
-                switchToNativeContext();
-                Document nativeDocument = loadXMLFromString(driver.getPageSource());
-                String textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
-                List<String> nativeTexts = new ArrayList<>();
-                for (Element textElement : nativeDocument.selectXpath(textNodeSelector)) {
-                    String textAttr = textElement.attr(isIos ? "value" : "text");
-                    textAttr = textAttr.trim().toLowerCase();
-                    if (!textAttr.isEmpty()) nativeTexts.add(textAttr);
-                }
-
-                Set<String> contexts = driver.getContextHandles();
-                boolean hasWebContext = contexts.stream().anyMatch(context -> !NATIVE_CONTEXT.equals(context));
-                if (!hasWebContext) {
-                    System.out.println("No web context is available, contexts: " + String.join(", ", contexts));
-                }
-
-                for (String context : contexts) {
-                    if (context.startsWith("WEBVIEW") || context.equals("CHROMIUM")) {
-                        String source = null;
-                        try {
-                            switchContext(context);
-                            source = driver.getPageSource();
-                        } catch (Exception ex) {
-                            System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
-                            continue;
-                        }
-
-                        if (source == null) continue;
-                        ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
-                        if (contextInfo == null) {
-                            contextInfo = new ContextInfo(context);
-                            contextInfos.add(contextInfo);
-                        }
-
-                        contextInfo.sourceLength = source.length();
-                        if (nativeTexts.isEmpty()) continue;
-
-                        Document htmlDoc = loadXMLFromString(source);
-                        String bodyString = htmlDoc.select("body").text().toLowerCase();
-                        long matchTexts = 0;
-                        for (String nativeText : nativeTexts) {
-                            if (bodyString.contains(nativeText)) matchTexts++;
-                        }
-
-                        contextInfo.matchTexts = matchTexts;
-                        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.size();
-                        if (contextInfo.matchTextsPercent >= 80) {
-                            break;
-                        }
-                    }
-                }
-
-                if (!contextInfos.isEmpty()) {
-                    ContextInfo bestContextInfo;
-                    contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
-                    if (contextInfos.get(0).matchTextsPercent > 40) {
-                        bestContextInfo = contextInfos.get(0);
-                    } else {
-                        contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
-                        bestContextInfo = contextInfos.get(0);
-                    }
-
-                    switchContext(bestContextInfo.context);
-                    System.out.println(String.format("Switched to %s web context successfully with confident %s%%", bestContextInfo.context, bestContextInfo.matchTextsPercent));
-                    return bestContextInfo.context;
-                }
-
-                throw new Exception("Cannot find any web context");
+                return switchToWebContextCore();
             }
         }, 4, 10000);
     }
