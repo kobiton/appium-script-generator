@@ -117,8 +117,7 @@ public class TestBase {
         switchContext(NATIVE_CONTEXT);
     }
 
-    public String switchToWebContext() throws Exception {
-        System.out.println("Finding a web context");
+    public String switchToWebContextCore() throws Exception {
         List<ContextInfo> contextInfos = new ArrayList<>();
 
         switchToNativeContext();
@@ -189,6 +188,18 @@ public class TestBase {
         }
 
         throw new Exception("Cannot find any web context");
+    }
+
+    public String switchToWebContext() throws Exception {
+        // Some web page is very slow to load (up to 30s),
+        // and there is no web context until it finish loading
+        return Utils.retry(new Utils.Task<String>() {
+            @Override
+            String exec(int attempt) throws Exception {
+                System.out.println(String.format("Finding a web context %s attempt", Utils.convertToOrdinal(attempt)));
+                return switchToWebContextCore();
+            }
+        }, 4, 10000);
     }
 
     public Rectangle findWebElementRect(By... locators) throws Exception {

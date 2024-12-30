@@ -103,9 +103,8 @@ namespace AppiumTest
             SwitchContext(NativeContext);
         }
 
-        public string SwitchToWebContext()
+        public string SwitchToWebContextCore()
         {
-            Log("Finding a web context");
             List<ContextInfo> contextInfos = new List<ContextInfo>();
 
             SwitchToNativeContext();
@@ -204,6 +203,15 @@ namespace AppiumTest
             }
 
             throw new Exception("Cannot find any web context");
+        }
+
+        public string SwitchToWebContext()
+        {
+            return Utils.Retry<string>((attempt) =>
+            {
+                Log($"Finding a web context {Utils.ConvertToOrdinal(attempt)} attempt");
+                return SwitchToWebContextCore();
+            }, null, 4, 10000);
         }
 
         protected XmlDocument LoadXMLFromString(string xml)

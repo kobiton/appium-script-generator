@@ -97,8 +97,7 @@ export default class TestBase {
     return get(response, 'value')
   }
 
-  async switchToWebContext() {
-    console.log('Finding a web context')
+  async switchToWebContextCore() {
     const contextInfos = []
 
     await this.switchToNativeContext()
@@ -186,6 +185,15 @@ export default class TestBase {
     }
 
     throw new Error('Cannot find any usable web contexts')
+  }
+
+  async switchToWebContext() {
+    // Some web page is very slow to load (up to 30s),
+    // and there is no web context until it finish loading
+    return await Utils.retry(async (attempt) => {
+      console.log(`Finding a web context attempt ${attempt}`)
+      await this.switchToWebContextCore()
+    }, 4, 10000)
   }
 
   async findWebElementRect(locators) {
