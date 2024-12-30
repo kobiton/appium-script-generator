@@ -198,8 +198,7 @@ namespace AppiumTest
                 }
 
                 SwitchContext(bestContextInfo.context);
-                Log(
-                    $"Switched to {bestContextInfo.context} web context successfully with confident {bestContextInfo.matchTextsPercent}%");
+                Log($"Switched to {bestContextInfo.context} web context successfully with confident {bestContextInfo.matchTextsPercent}%");
                 return bestContextInfo.context;
             }
 
