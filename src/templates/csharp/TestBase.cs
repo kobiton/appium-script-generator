@@ -105,105 +105,109 @@ namespace AppiumTest
 
         public string SwitchToWebContext()
         {
-            Log("Finding a web context");
-            List<ContextInfo> contextInfos = new List<ContextInfo>();
-
-            SwitchToNativeContext();
-            XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-            string textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
-            List<string> nativeTexts = new List<string>();
-            var textNodes = nativeDocument.SelectNodes(textNodeSelector);
-
-            if (textNodes != null)
+            return Utils.Retry((attempt) =>
             {
-                foreach (XmlNode element in textNodes)
+                Log($"Finding a web context {Utils.ConvertToOrdinal(attempt)} attempt");
+                List<ContextInfo> contextInfos = new List<ContextInfo>();
+
+                SwitchToNativeContext();
+                XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
+                string textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
+                List<string> nativeTexts = new List<string>();
+                var textNodes = nativeDocument.SelectNodes(textNodeSelector);
+
+                if (textNodes != null)
                 {
-                    if (element.NodeType != XmlNodeType.Element) continue;
-                    string? textAttr = element.Attributes?[isIos ? "value" : "text"]?.Value;
-                    if (textAttr == null)
-                        textAttr = "";
-                    textAttr = textAttr.Trim().ToLower();
-                    if (!string.IsNullOrEmpty(textAttr))
-                        nativeTexts.Add(textAttr);
-                }
-            }
-
-            var contexts = driver.Contexts;
-            var hasWebContext = contexts.Any(context => !context.Equals(NativeContext));
-            if (!hasWebContext)
-            {
-                Log("No web context is available, contexts: " + string.Join(", ", contexts));
-            }
-
-            foreach (var context in contexts)
-            {
-                if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
-                {
-                    string source = null;
-                    try
+                    foreach (XmlNode element in textNodes)
                     {
-                        SwitchContext(context);
-                        source = driver.PageSource;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
-                        continue;
-                    }
-
-                    if (source == null) continue;
-                    ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
-                    if (contextInfo == null)
-                    {
-                        contextInfo = new ContextInfo(context);
-                        contextInfos.Add(contextInfo);
-                    }
-
-                    contextInfo.sourceLength = source.Length;
-                    if (nativeTexts.IsNullOrEmpty()) continue;
-
-                    HtmlDocument htmlDoc = LoadHTMLFromString(source);
-                    HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
-                    if (bodyElement == null) continue;
-
-                    string bodyString = Utils.GetAllText(bodyElement).ToLower();
-
-                    long matchTexts = 0;
-                    foreach (string nativeText in nativeTexts)
-                    {
-                        if (bodyString.Contains(nativeText)) matchTexts++;
-                    }
-
-                    contextInfo.matchTexts = matchTexts;
-                    contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
-                    if (contextInfo.matchTextsPercent >= 80)
-                    {
-                        break;
+                        if (element.NodeType != XmlNodeType.Element) continue;
+                        string? textAttr = element.Attributes?[isIos ? "value" : "text"]?.Value;
+                        if (textAttr == null)
+                            textAttr = "";
+                        textAttr = textAttr.Trim().ToLower();
+                        if (!string.IsNullOrEmpty(textAttr))
+                            nativeTexts.Add(textAttr);
                     }
                 }
-            }
 
-            if (!contextInfos.IsNullOrEmpty())
-            {
-                ContextInfo bestContextInfo;
-                contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
-                    (int)(c2.matchTextsPercent - c1.matchTextsPercent));
-                if (contextInfos[0].matchTextsPercent > 40)
+                var contexts = driver.Contexts;
+                var hasWebContext = contexts.Any(context => !context.Equals(NativeContext));
+                if (!hasWebContext)
                 {
-                    bestContextInfo = contextInfos[0];
-                }
-                else
-                {
-                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
-                    bestContextInfo = contextInfos[0];
+                    Log("No web context is available, contexts: " + string.Join(", ", contexts));
                 }
 
-                SwitchContext(bestContextInfo.context);
-                Log($"Switched to {bestContextInfo.context} web context successfully with confident {bestContextInfo.matchTextsPercent}%");
-                return bestContextInfo.context;
-            }
+                foreach (var context in contexts)
+                {
+                    if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
+                    {
+                        string source = null;
+                        try
+                        {
+                            SwitchContext(context);
+                            source = driver.PageSource;
+                        }
+                        catch (Exception ex)
+                        {
+                            Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
+                            continue;
+                        }
 
-            throw new Exception("Cannot find any web context");
+                        if (source == null) continue;
+                        ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
+                        if (contextInfo == null)
+                        {
+                            contextInfo = new ContextInfo(context);
+                            contextInfos.Add(contextInfo);
+                        }
+
+                        contextInfo.sourceLength = source.Length;
+                        if (nativeTexts.IsNullOrEmpty()) continue;
+
+                        HtmlDocument htmlDoc = LoadHTMLFromString(source);
+                        HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
+                        if (bodyElement == null) continue;
+
+                        string bodyString = Utils.GetAllText(bodyElement).ToLower();
+
+                        long matchTexts = 0;
+                        foreach (string nativeText in nativeTexts)
+                        {
+                            if (bodyString.Contains(nativeText)) matchTexts++;
+                        }
+
+                        contextInfo.matchTexts = matchTexts;
+                        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
+                        if (contextInfo.matchTextsPercent >= 80)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (!contextInfos.IsNullOrEmpty())
+                {
+                    ContextInfo bestContextInfo;
+                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
+                        (int)(c2.matchTextsPercent - c1.matchTextsPercent));
+                    if (contextInfos[0].matchTextsPercent > 40)
+                    {
+                        bestContextInfo = contextInfos[0];
+                    }
+                    else
+                    {
+                        contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
+                        bestContextInfo = contextInfos[0];
+                    }
+
+                    SwitchContext(bestContextInfo.context);
+                    Log(
+                        $"Switched to {bestContextInfo.context} web context successfully with confident {bestContextInfo.matchTextsPercent}%");
+                    return bestContextInfo.context;
+                }
+
+                throw new Exception("Cannot find any web context");
+            }, null, 4, 10000);
         }
 
         protected XmlDocument LoadXMLFromString(string xml)
