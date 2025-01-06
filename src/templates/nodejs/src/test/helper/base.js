@@ -257,8 +257,12 @@ export default class TestBase {
         // Try more chance by finding the TopBrowserBar in the xml source.
         const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
         const webviewElement = nativeDocument.get('(//XCUIElementTypeWebView)[1]')
+        if (!webviewElement) {
+          throw new Error('Cannot find webview element')
+        }
+
         let curElement = webviewElement.parent()
-        while (curElement != null) {
+        while (curElement != null && curElement.type() === 'element') {
           const firstChildElement = curElement.childNodes().find((child) => child.type() === 'element')
           const firstChildRect = new Rectangle(
             {

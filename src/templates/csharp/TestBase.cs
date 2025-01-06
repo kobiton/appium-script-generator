@@ -303,6 +303,11 @@ namespace AppiumTest
                 {
                     XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
                     XmlNode webviewNode = nativeDocument.SelectSingleNode("(//XCUIElementTypeWebView)[1]");
+                    if (webviewNode == null)
+                    {
+                        throw new Exception("Cannot find webview element");
+                    }
+
                     XmlNode curElement = webviewNode.ParentNode;
 
                     while (curElement != null)

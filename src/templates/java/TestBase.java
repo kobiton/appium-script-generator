@@ -261,6 +261,10 @@ public class TestBase {
             } catch (Exception ignored) {
                 Document nativeDocument = loadXMLFromString(driver.getPageSource());
                 Element webviewElement = nativeDocument.selectXpath("(//XCUIElementTypeWebView)[1]").first();
+                if (webviewElement == null) {
+                    throw new Exception("Cannot find webview element");
+                }
+
                 Element curElement = webviewElement.parent();
                 while (curElement != null) {
                     Element firstChildElement = curElement.child(0);
