@@ -120,50 +120,52 @@ export default class TestBase {
     }
 
     for (const context of contexts) {
-      if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
-        let source = null
-        try {
-          await this.switchContext(context)
-          source = await this._driver.getSource()
-        }
-        catch (error) {
-          console.log(`Bad context ${context}, error "${error.message}", skipping...`)
-          continue
-        }
+      if (!context.startsWith('WEBVIEW') && context !== 'CHROMIUM') continue
+      let source = null
+      try {
+        await this.switchContext(context)
+        const res = await this._driver.execute('return document.hidden')
+        const isHiddenDocument = get(res, 'value')
+        if (isHiddenDocument) continue
+        source = await this._driver.getSource()
+      }
+      catch (error) {
+        console.log(`Bad context ${context}, error "${error.message}", skipping...`)
+        continue
+      }
 
-        if (source === null) continue
+      if (source === null) continue
 
-        let contextInfo = contextInfos.find(e => e.context === context)
-        if (!contextInfo) {
-          contextInfo = {
-            context,
-            sourceLength: source.length,
-            matchTextsPercent: 0
-          }
-
-          contextInfos.push(contextInfo)
-        }
-
-        if (nativeTexts.length === 0) continue
-
-        const htmlDoc = this.loadHtmlFromString(source)
-        const bodyElement = htmlDoc.get('//body')
-        if (!bodyElement) continue
-
-        let bodyString = Utils.getAllText(bodyElement)
-        if (!bodyString) continue
-        bodyString = bodyString.toLowerCase()
-
-        let matchTexts = 0
-        for (const nativeText of nativeTexts) {
-          if (bodyString.includes(nativeText)) matchTexts++
+      let contextInfo = contextInfos.find(e => e.context === context)
+      if (!contextInfo) {
+        contextInfo = {
+          context,
+          sourceLength: source.length,
+          matchTextsPercent: 0
         }
 
-        contextInfo.matchTexts = matchTexts
-        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
-        if (contextInfo.matchTextsPercent >= 80) {
-          break
-        }
+        contextInfos.push(contextInfo)
+      }
+
+      if (nativeTexts.length === 0) continue
+
+      const htmlDoc = this.loadHtmlFromString(source)
+      const bodyElement = htmlDoc.get('//body')
+      if (!bodyElement) continue
+
+      let bodyString = Utils.getAllText(bodyElement)
+      if (!bodyString) continue
+      bodyString = bodyString.toLowerCase()
+
+      let matchTexts = 0
+      for (const nativeText of nativeTexts) {
+        if (bodyString.includes(nativeText)) matchTexts++
+      }
+
+      contextInfo.matchTexts = matchTexts
+      contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
+      if (contextInfo.matchTextsPercent >= 80) {
+        break
       }
     }
 

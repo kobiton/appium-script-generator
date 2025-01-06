@@ -136,49 +136,49 @@ namespace AppiumTest
 
             foreach (var context in contexts)
             {
-                if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
+                if (!context.StartsWith("WEBVIEW") && !context.Equals("CHROMIUM")) continue;
+                string source;
+                try
                 {
-                    string source = null;
-                    try
-                    {
-                        SwitchContext(context);
-                        source = driver.PageSource;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
-                        continue;
-                    }
+                    SwitchContext(context);
+                    var isHiddenDocument = (bool) driver.ExecuteScript("return document.hidden");
+                    if (isHiddenDocument) continue;
+                    source = driver.PageSource;
+                }
+                catch (Exception ex)
+                {
+                    Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
+                    continue;
+                }
 
-                    if (source == null) continue;
-                    ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
-                    if (contextInfo == null)
-                    {
-                        contextInfo = new ContextInfo(context);
-                        contextInfos.Add(contextInfo);
-                    }
+                if (source == null) continue;
+                ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
+                if (contextInfo == null)
+                {
+                    contextInfo = new ContextInfo(context);
+                    contextInfos.Add(contextInfo);
+                }
 
-                    contextInfo.sourceLength = source.Length;
-                    if (nativeTexts.IsNullOrEmpty()) continue;
+                contextInfo.sourceLength = source.Length;
+                if (nativeTexts.IsNullOrEmpty()) continue;
 
-                    HtmlDocument htmlDoc = LoadHTMLFromString(source);
-                    HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
-                    if (bodyElement == null) continue;
+                HtmlDocument htmlDoc = LoadHTMLFromString(source);
+                HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
+                if (bodyElement == null) continue;
 
-                    string bodyString = Utils.GetAllText(bodyElement).ToLower();
+                string bodyString = Utils.GetAllText(bodyElement).ToLower();
 
-                    long matchTexts = 0;
-                    foreach (string nativeText in nativeTexts)
-                    {
-                        if (bodyString.Contains(nativeText)) matchTexts++;
-                    }
+                long matchTexts = 0;
+                foreach (string nativeText in nativeTexts)
+                {
+                    if (bodyString.Contains(nativeText)) matchTexts++;
+                }
 
-                    contextInfo.matchTexts = matchTexts;
-                    contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
-                    if (contextInfo.matchTextsPercent >= 80)
-                    {
-                        break;
-                    }
+                contextInfo.matchTexts = matchTexts;
+                contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
+                if (contextInfo.matchTextsPercent >= 80)
+                {
+                    break;
                 }
             }
 
