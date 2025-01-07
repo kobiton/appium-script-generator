@@ -137,38 +137,39 @@ public class TestBase {
         }
 
         for (String context : contexts) {
-            if (context.startsWith("WEBVIEW") || context.equals("CHROMIUM")) {
-                String source = null;
-                try {
-                    switchContext(context);
-                    source = driver.getPageSource();
-                } catch (Exception ex) {
-                    System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
-                    continue;
-                }
+            if (!context.startsWith("WEBVIEW") && !context.equals("CHROMIUM")) continue;
+            String source;
+            try {
+                switchContext(context);
+                boolean isHiddenDocument = (boolean) driver.executeScript("return document.hidden");
+                if (isHiddenDocument) continue;
+                source = driver.getPageSource();
+            } catch (Exception ex) {
+                System.out.println(String.format("Bad context %s, error \"%s\", skipping...", context, ex.getMessage()));
+                continue;
+            }
 
-                if (source == null) continue;
-                ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
-                if (contextInfo == null) {
-                    contextInfo = new ContextInfo(context);
-                    contextInfos.add(contextInfo);
-                }
+            if (source == null) continue;
+            ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
+            if (contextInfo == null) {
+                contextInfo = new ContextInfo(context);
+                contextInfos.add(contextInfo);
+            }
 
-                contextInfo.sourceLength = source.length();
-                if (nativeTexts.isEmpty()) continue;
+            contextInfo.sourceLength = source.length();
+            if (nativeTexts.isEmpty()) continue;
 
-                Document htmlDoc = loadXMLFromString(source);
-                String bodyString = htmlDoc.select("body").text().toLowerCase();
-                long matchTexts = 0;
-                for (String nativeText : nativeTexts) {
-                    if (bodyString.contains(nativeText)) matchTexts++;
-                }
+            Document htmlDoc = loadXMLFromString(source);
+            String bodyString = htmlDoc.select("body").text().toLowerCase();
+            long matchTexts = 0;
+            for (String nativeText : nativeTexts) {
+                if (bodyString.contains(nativeText)) matchTexts++;
+            }
 
-                contextInfo.matchTexts = matchTexts;
-                contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.size();
-                if (contextInfo.matchTextsPercent >= 80) {
-                    break;
-                }
+            contextInfo.matchTexts = matchTexts;
+            contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.size();
+            if (contextInfo.matchTextsPercent >= 80) {
+                break;
             }
         }
 
