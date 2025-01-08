@@ -277,7 +277,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
     for (const step of testSteps) {
       const {
-        id, context, actionJson, selectorConfigurations, findingElementTimeout
+        id, context, actionJson, selectorConfigurations, isOnKeyboard, findingElementTimeout
       } = step
       if (!actionJson) continue
 
@@ -333,6 +333,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           const {elementInfo, x, y} = action
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
 
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             const elementVarName = `element${rawLocatorVarName}`
             // eslint-disable-next-line max-len
@@ -356,6 +357,8 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'swipeFromElement': {
           const {x1, y1, x2, y2, duration} = action
+
+          !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           if (context === CONTEXTS.NATIVE) {
             /* eslint-disable */
             const elementVarName = `element${rawLocatorVarName}`

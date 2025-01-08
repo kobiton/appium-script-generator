@@ -370,7 +370,8 @@ export default class TestBase {
 
   async findElementOnScrollableInContext(isWebContext, locators) {
     const infoMap = JSON.parse(this.getResourceAsString(`${this.getCurrentCommandId()}.json`))
-    let centerOfScrollableElement = null
+    const screenSize = await this.getScreenSize()
+    let scrollableElement = null
     let swipedToTop = false
     const touchableElement = await Utils.retry(async (attempt) => {
       if (isWebContext && attempt === 1) {
@@ -386,13 +387,14 @@ export default class TestBase {
       }
 
       const rect = await this.getRect(foundElement)
-      if (rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
+      const isVisible = (await this._driver.elementIdDisplayed(foundElement.ELEMENT)).value
+      if (!isVisible || rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
         throw new Error("Element is found but is not visible")
       }
 
       return foundElement
     }, async (err, attempt) => {
-      console.log(`Cannot find touchable element on scrollable, ${attempt} attempt`)
+      console.log(`Cannot find touchable element on scrollable ${attempt} attempt, error: ${err.message}`)
       // Might switch to the wrong web context on the first attempt; retry before scrolling down
       if (isWebContext && attempt === 1) {
         // Wait a bit for web is fully loaded
@@ -401,19 +403,26 @@ export default class TestBase {
         return
       }
 
-      if (centerOfScrollableElement === null) {
-        const scrollableElement = await this._findElement(null, infoMap['scrollableElementXpath'])
-        const scrollableRect = await this.getRect(scrollableElement)
-        centerOfScrollableElement = this.getCenterOfRect(scrollableRect)
+      if (scrollableElement === null) {
+        scrollableElement = await this._findElement(null, infoMap['scrollableElementXpath'])
       }
 
       if (!swipedToTop) {
         await this.hideKeyboard()
-        await this.swipeToTop(centerOfScrollableElement)
+        const scrollableRect = await this.getRect(scrollableElement)
+        await this.swipeToTop(this.getCenterOfRect(scrollableRect))
         swipedToTop = true
       }
       else {
-        await this.dragFromPoint(centerOfScrollableElement, 0, -0.5)
+        const rect = await this.getRect(scrollableElement)
+        const center = this.getCenterOfRect(rect)
+        // Fix bug when scrollableElement is out of viewport
+        if (center.y > screenSize.y || rect.height < 0) {
+          center.y = screenSize.y / 2
+        }
+
+        const toPoint = new Point(center.x, Math.max(center.y - rect.height / 1.5, 0))
+        await this.dragByPoint(center, toPoint)
       }
     }, 5, 3000)
 
@@ -533,29 +542,49 @@ export default class TestBase {
   }
 
   async dragByPoint(fromPoint, toPoint) {
-    let actions
-    if (this._isIos) {
-      actions = [
-        {action: 'moveTo', x: fromPoint.x, y: fromPoint.y},
-        {action: 'press', x: fromPoint.x, y: fromPoint.y},
-        {action: 'wait', ms: 2000},
-        {action: 'moveTo', x: toPoint.x, y: toPoint.y},
-        {action: 'release'}
-      ]
-    }
-    else {
-      actions = [
-        {action: 'moveTo', x: fromPoint.x, y: fromPoint.y},
-        {action: 'press', x: fromPoint.x, y: fromPoint.y},
-        {action: 'moveTo', x: toPoint.x, y: toPoint.y},
-        {action: 'wait', ms: 300},
-        {action: 'moveTo', x: 0, y: 0},
-        {action: 'release'}
-      ]
+    const steps = 20
+    const duration = 5000
+    const stepDuration = duration / steps
+    const xStep = (toPoint.x - fromPoint.x) / steps
+    const yStep = (toPoint.y - fromPoint.y) / steps
+
+    const actions = [
+      {
+        type: 'pointer',
+        id: 'finger',
+        parameters: { pointerType: 'touch' },
+        actions: [
+          { type: 'pointerMove', duration: 0, origin: 'viewport', x: fromPoint.x, y: fromPoint.y },
+          { type: 'pointerDown', button: 0 }
+        ]
+      }
+    ]
+
+    for (let i = 1; i <= steps; i++) {
+      const nextX = fromPoint.x + Math.round(xStep * i)
+      const nextY = fromPoint.y + Math.round(yStep * i)
+      actions[0].actions.push({
+        type: 'pointerMove',
+        duration: stepDuration,
+        origin: 'viewport',
+        x: nextX,
+        y: nextY
+      })
     }
 
+    actions[0].actions.push({ type: 'pointerUp', button: 0 })
+
     console.log(`Drag from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
-    await this._driver.touchAction(actions)
+    await this.appiumActions(actions)
+  }
+
+  async appiumActions(actions) {
+    const response = await axios.post(
+      `${this._proxy.getServerUrl()}/wd/hub/session/${this._driver.requestHandler.sessionID}/actions`,
+      {actions}
+    )
+
+    return response.data.value
   }
 
   async dragFromPoint(fromPoint, relativeOffsetX, relativeOffsetY) {
@@ -660,10 +689,11 @@ export default class TestBase {
       if (!isKeyboardShown) return
 
       console.log('Keyboard is shown, hiding it')
-      await this._driver.hideKeyboard()
+      await axios.post(
+        `${this._proxy.getServerUrl()}/wd/hub/session/${this._driver.requestHandler.sessionID}/appium/device/hide_keyboard`
+      )
     }
-    catch (ignored) {
-    }
+    catch (ignored) {}
   }
 
   async setImplicitWaitInMiliSecond(ms) {

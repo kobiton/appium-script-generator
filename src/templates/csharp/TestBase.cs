@@ -502,7 +502,7 @@ namespace AppiumTest
                     }
 
                     var rect = foundElement.Rect;
-                    if (rect.X < 0 || rect.Y < 0 || rect.Width == 0 || rect.Height == 0)
+                    if (!foundElement.Displayed || rect.X < 0 || rect.Y < 0 || rect.Width == 0 || rect.Height == 0)
                     {
                         throw new Exception("Element is found but is not visible");
                     }
@@ -511,7 +511,7 @@ namespace AppiumTest
                 },
                 (exception, attempt) =>
                 {
-                    Log($"Cannot find touchable element, {Utils.ConvertToOrdinal(attempt)} attempt");
+                    Log($"Cannot find touchable element {Utils.ConvertToOrdinal(attempt)} attempt, error: {exception.Message}");
                     // Might switch to the wrong web context on the first attempt; retry before scrolling down
                     if (isWebContext && attempt == 1) {
                         // Wait a bit for web is fully loaded
@@ -541,7 +541,8 @@ namespace AppiumTest
                             center.Y = screenSize.Y / 2;
                         }
 
-                        DragFromPoint(center, 0, -0.5);
+                        var toPoint = new Point(center.X, Math.Max((int) (center.Y - rect.Height / 1.5), 0));
+                        DragByPoint(center, toPoint);
                     }
 
                     return 0;
@@ -744,34 +745,29 @@ namespace AppiumTest
          */
         public void DragByPoint(Point fromPoint, Point toPoint)
         {
-            PointerInputDevice finger = new PointerInputDevice(PointerKind.Touch, "finger");
-            ActionSequence sequence = new ActionSequence(finger, 0);
+            var pointer = new PointerInputDevice(PointerKind.Touch);
+            var sequence = new ActionSequence(pointer, 0);
 
-            if (isIos)
+            int steps = 20;
+            int duration = 5000;
+            int stepDuration = duration / steps;
+            double xStep = (toPoint.X - fromPoint.X) / (double)steps;
+            double yStep = (toPoint.Y - fromPoint.Y) / (double)steps;
+
+            sequence.AddAction(pointer.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y, TimeSpan.Zero));
+            sequence.AddAction(pointer.CreatePointerDown(MouseButton.Left));
+
+            for (int i = 1; i <= steps; i++)
             {
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y,
-                    TimeSpan.FromMilliseconds(0)));
-                sequence.AddAction(finger.CreatePointerDown(MouseButton.Middle));
-                sequence.AddAction(finger.CreatePause(TimeSpan.FromMilliseconds(2000)));
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y,
-                    TimeSpan.FromMilliseconds(300)));
-                sequence.AddAction(finger.CreatePointerUp(MouseButton.Middle));
+                int nextX = fromPoint.X + (int)(xStep * i);
+                int nextY = fromPoint.Y + (int)(yStep * i);
+                sequence.AddAction(pointer.CreatePointerMove(CoordinateOrigin.Viewport, nextX, nextY, TimeSpan.FromMilliseconds(stepDuration)));
             }
-            else
-            {
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, fromPoint.X, fromPoint.Y,
-                    TimeSpan.FromMilliseconds(0)));
-                sequence.AddAction(finger.CreatePointerDown(MouseButton.Middle));
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, toPoint.X, toPoint.Y,
-                    TimeSpan.FromMilliseconds(300)));
-                sequence.AddAction(finger.CreatePause(TimeSpan.FromMilliseconds(300)));
-                sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Pointer, 0, 0,
-                    TimeSpan.FromMilliseconds(300)));
-                sequence.AddAction(finger.CreatePointerUp(MouseButton.Middle));
-            }
+
+            sequence.AddAction(pointer.CreatePointerUp(MouseButton.Left));
 
             Log($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
-            driver.PerformActions(new List<ActionSequence> { sequence });
+            driver.PerformActions(new[] {sequence});
         }
 
         public void SendKeys(string keys)

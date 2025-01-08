@@ -424,7 +424,7 @@ public class TestBase {
                 }
 
                 Rectangle rect = foundElement.getRect();
-                if (rect.x < 0 || rect.y < 0|| rect.width == 0 || rect.height == 0) {
+                if (!foundElement.isDisplayed() || rect.x < 0 || rect.y < 0|| rect.width == 0 || rect.height == 0) {
                     throw new Exception("Element is found but is not visible");
                 }
 
@@ -433,7 +433,7 @@ public class TestBase {
 
             @Override
             public void handleException(Exception e, int attempt) throws Exception {
-                System.out.println(String.format("Cannot find touchable element on scrollable, %s attempt", Utils.convertToOrdinal(attempt)));
+                System.out.println(String.format("Cannot find touchable element on scrollable %s attempt, error: %s", Utils.convertToOrdinal(attempt), e.getMessage()));
                 // Might switch to the wrong web context on the first attempt; retry before scrolling down
                 if (isWebContext && attempt == 1) {
                     // Wait a bit for web is fully loaded
@@ -458,7 +458,8 @@ public class TestBase {
                         center.y = screenSize.y / 2;
                     }
 
-                    dragFromPoint(center, 0, -0.5);
+                    Point toPoint = new Point(center.x, Math.max((int) (center.y - rect.height / 1.5), 0));
+                    dragByPoint(center, toPoint);
                 }
             }
         }, 5, 3000);
@@ -641,24 +642,24 @@ public class TestBase {
         PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
         Sequence sequence = new Sequence(finger, 0);
 
-        if (isIos) {
-            sequence.addAction(finger.createPointerMove(Duration.ofMillis(0), PointerInput.Origin.viewport(), fromPoint.x, fromPoint.y));
-            sequence.addAction(finger.createPointerDown(PointerInput.MouseButton.MIDDLE.asArg()));
-            sequence.addAction(new Pause(finger, Duration.ofMillis(2000)));
-            sequence.addAction(finger.createPointerMove(Duration.ofMillis(300), PointerInput.Origin.viewport(), toPoint.x, toPoint.y));
-            sequence.addAction(finger.createPointerUp(PointerInput.MouseButton.MIDDLE.asArg()));
-        } else {
-            sequence.addAction(finger.createPointerMove(Duration.ofMillis(0), PointerInput.Origin.viewport(), fromPoint.x, fromPoint.y));
-            sequence.addAction(finger.createPointerDown(PointerInput.MouseButton.MIDDLE.asArg()));
-            sequence.addAction(finger.createPointerMove(Duration.ofMillis(300), PointerInput.Origin.viewport(), toPoint.x, toPoint.y));
-            sequence.addAction(new Pause(finger, Duration.ofMillis(300)));
-            sequence.addAction(finger.createPointerMove(Duration.ofMillis(300), PointerInput.Origin.pointer(), 0, 0));
-            sequence.addAction(finger.createPointerUp(PointerInput.MouseButton.MIDDLE.asArg()));
+        int steps = 20;
+        int duration = 5000;
+        int stepDuration = duration / steps;
+        double xStep = (toPoint.x - fromPoint.x) / (double) steps;
+        double yStep = (toPoint.y - fromPoint.y) / (double) steps;
+
+        sequence.addAction(finger.createPointerMove(Duration.ofMillis(0), PointerInput.Origin.viewport(), fromPoint.x, fromPoint.y));
+        sequence.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
+        for (int i = 1; i <= steps; i++) {
+            int nextX = fromPoint.x + (int) (xStep * i);
+            int nextY = fromPoint.y + (int) (yStep * i);
+            sequence.addAction(finger.createPointerMove(Duration.ofMillis(stepDuration), PointerInput.Origin.viewport(), nextX, nextY));
         }
+
+        sequence.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
 
         System.out.println(String.format("Drag from point (%s, %s) to point (%s, %s)", fromPoint.x, fromPoint.y, toPoint.x, toPoint.y));
         driver.perform(Arrays.asList(sequence));
-
         return sequence;
     }
 
