@@ -554,8 +554,8 @@ export default class TestBase {
         id: 'finger',
         parameters: { pointerType: 'touch' },
         actions: [
-          { type: 'pointerMove', duration: 0, origin: 'viewport', x: fromPoint.x, y: fromPoint.y },
-          { type: 'pointerDown', button: 0 }
+          {type: 'pointerMove', duration: 0, origin: 'viewport', x: fromPoint.x, y: fromPoint.y},
+          {type: 'pointerDown', button: 0}
         ]
       }
     ]
@@ -572,7 +572,7 @@ export default class TestBase {
       })
     }
 
-    actions[0].actions.push({ type: 'pointerUp', button: 0 })
+    actions[0].actions.push({type: 'pointerUp', button: 0})
 
     console.log(`Drag from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
     await this.appiumActions(actions)
