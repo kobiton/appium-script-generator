@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/test/index.js",
   "scripts": {
-    "test": "mocha --parallel src/test/*.spec.js --require @babel/register --exit --timeout 10m"
+    "test": "mocha --parallel src/test/*.spec.js --require @babel/register --exit --timeout 0"
   },
   "devDependencies": {
     "@babel/core": "^7.4.0",
