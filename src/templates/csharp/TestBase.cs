@@ -109,21 +109,41 @@ namespace AppiumTest
 
             SwitchToNativeContext();
             XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-            string textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
             List<string> nativeTexts = new List<string>();
-            var textNodes = nativeDocument.SelectNodes(textNodeSelector);
+            var textNodes = nativeDocument.SelectNodes(GetWebviewXpathSelector() + "//*");
 
             if (textNodes != null)
             {
                 foreach (XmlNode element in textNodes)
                 {
                     if (element.NodeType != XmlNodeType.Element) continue;
-                    string? textAttr = element.Attributes?[isIos ? "value" : "text"]?.Value;
-                    if (textAttr == null)
-                        textAttr = "";
-                    textAttr = textAttr.Trim().ToLower();
-                    if (!string.IsNullOrEmpty(textAttr))
-                        nativeTexts.Add(textAttr);
+                    if (element.ChildNodes.Count != 0) continue;
+                    XmlAttribute? textAttr;
+                    if (isIos)
+                    {
+                        var excludeTags = new List<string> { "XCUIElementTypeImage", "XCUIElementTypeSwitch" };
+                        if (excludeTags.Contains(element.Name)) continue;
+
+                        textAttr = element.Attributes?["value"];
+                        if (textAttr == null || string.IsNullOrEmpty(textAttr.Value))
+                        {
+                            textAttr = element.Attributes?["label"];
+                        }
+                    }
+                    else
+                    {
+                        textAttr = element.Attributes?["text"];
+                        if ((textAttr == null || string.IsNullOrEmpty(textAttr.Value)) &&
+                            "android.view.View".Equals(element.Name))
+                        {
+                            textAttr = element.Attributes?["content-desc"];
+                        }
+                    }
+
+                    var text = textAttr != null ? textAttr.Value : "";
+                    text = text.Trim().ToLower();
+                    if (!string.IsNullOrEmpty(text))
+                        nativeTexts.Add(text);
                 }
             }
 
@@ -136,49 +156,49 @@ namespace AppiumTest
 
             foreach (var context in contexts)
             {
-                if (context.StartsWith("WEBVIEW") || context.Equals("CHROMIUM"))
+                if (!context.StartsWith("WEBVIEW") && !context.Equals("CHROMIUM")) continue;
+                string source;
+                try
                 {
-                    string source = null;
-                    try
-                    {
-                        SwitchContext(context);
-                        source = driver.PageSource;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
-                        continue;
-                    }
+                    SwitchContext(context);
+                    var isHiddenDocument = (bool) driver.ExecuteScript("return document.hidden");
+                    if (isHiddenDocument) continue;
+                    source = driver.PageSource;
+                }
+                catch (Exception ex)
+                {
+                    Log($"Bad context {context}, error \"{ex.Message}\", skipping...");
+                    continue;
+                }
 
-                    if (source == null) continue;
-                    ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
-                    if (contextInfo == null)
-                    {
-                        contextInfo = new ContextInfo(context);
-                        contextInfos.Add(contextInfo);
-                    }
+                if (source == null) continue;
+                ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
+                if (contextInfo == null)
+                {
+                    contextInfo = new ContextInfo(context);
+                    contextInfos.Add(contextInfo);
+                }
 
-                    contextInfo.sourceLength = source.Length;
-                    if (nativeTexts.IsNullOrEmpty()) continue;
+                contextInfo.sourceLength = source.Length;
+                if (nativeTexts.IsNullOrEmpty()) continue;
 
-                    HtmlDocument htmlDoc = LoadHTMLFromString(source);
-                    HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
-                    if (bodyElement == null) continue;
+                HtmlDocument htmlDoc = LoadHTMLFromString(source);
+                HtmlNode? bodyElement = htmlDoc.DocumentNode.SelectSingleNode("//body");
+                if (bodyElement == null) continue;
 
-                    string bodyString = Utils.GetAllText(bodyElement).ToLower();
+                string bodyString = Utils.GetAllText(bodyElement).ToLower();
 
-                    long matchTexts = 0;
-                    foreach (string nativeText in nativeTexts)
-                    {
-                        if (bodyString.Contains(nativeText)) matchTexts++;
-                    }
+                long matchTexts = 0;
+                foreach (string nativeText in nativeTexts)
+                {
+                    if (bodyString.Contains(nativeText)) matchTexts++;
+                }
 
-                    contextInfo.matchTexts = matchTexts;
-                    contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
-                    if (contextInfo.matchTextsPercent >= 80)
-                    {
-                        break;
-                    }
+                contextInfo.matchTexts = matchTexts;
+                contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.Count();
+                if (contextInfo.matchTextsPercent >= 80)
+                {
+                    break;
                 }
             }
 
@@ -302,7 +322,7 @@ namespace AppiumTest
                 catch (Exception ignored)
                 {
                     XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-                    XmlNode webviewNode = nativeDocument.SelectSingleNode("(//XCUIElementTypeWebView)[1]");
+                    XmlNode webviewNode = nativeDocument.SelectSingleNode(GetWebviewXpathSelector());
                     if (webviewNode == null)
                     {
                         throw new Exception("Cannot find webview element");
@@ -591,8 +611,12 @@ namespace AppiumTest
 
         public AppiumWebElement FindWebview()
         {
-            string className = isIos ? "XCUIElementTypeWebView" : "android.webkit.WebView";
-            return driver.FindElement(By.ClassName(className));
+            return driver.FindElement(By.XPath(GetWebviewXpathSelector()));
+        }
+
+        public String GetWebviewXpathSelector()
+        {
+            return isIos ? "(//XCUIElementTypeWebView)[1]" : "(//android.webkit.WebView)[1]";
         }
 
         /**

@@ -103,13 +103,29 @@ export default class TestBase {
     await this.switchToNativeContext()
     const source = await this._driver.getSource()
     const nativeDocument = this.loadXMLFromString(source)
-    const textNodeSelector = this._isIos
-      ? '//XCUIElementTypeStaticText' : '//android.widget.TextView'
     const nativeTexts = []
-    for (const element of nativeDocument.find(textNodeSelector)) {
-      const textAttr = element.getAttribute(this._isIos ? 'value' : 'text')
-      const textValue = textAttr ? textAttr.value() : ''
-      if (textValue) nativeTexts.push(textValue.trim().toLowerCase())
+    for (const element of nativeDocument.find(this.getWebviewXpathSelector() + '//*')) {
+      if (element.childNodes().length !== 0) continue
+      let textAttr
+      if (this._isIos) {
+        const excludeTags = ['XCUIElementTypeImage', 'XCUIElementTypeSwitch']
+        if (excludeTags.includes(element.name())) continue
+
+        textAttr = element.getAttribute('value')
+        if (!textAttr || !textAttr.value()) {
+          textAttr = element.getAttribute('label')
+        }
+      }
+      else {
+        textAttr = element.getAttribute('text')
+        if ((!textAttr || !textAttr.value()) && element.name() === 'android.view.View') {
+          textAttr = element.getAttribute('content-desc')
+        }
+      }
+
+      let text = textAttr ? textAttr.value() : ''
+      text = text.trim().toLowerCase()
+      if (text) nativeTexts.push(text)
     }
 
     // Find the most webview is usable
@@ -120,50 +136,52 @@ export default class TestBase {
     }
 
     for (const context of contexts) {
-      if (context.startsWith('WEBVIEW') || context === 'CHROMIUM') {
-        let source = null
-        try {
-          await this.switchContext(context)
-          source = await this._driver.getSource()
-        }
-        catch (error) {
-          console.log(`Bad context ${context}, error "${error.message}", skipping...`)
-          continue
-        }
+      if (!context.startsWith('WEBVIEW') && context !== 'CHROMIUM') continue
+      let source = null
+      try {
+        await this.switchContext(context)
+        const res = await this._driver.execute('return document.hidden')
+        const isHiddenDocument = get(res, 'value')
+        if (isHiddenDocument) continue
+        source = await this._driver.getSource()
+      }
+      catch (error) {
+        console.log(`Bad context ${context}, error "${error.message}", skipping...`)
+        continue
+      }
 
-        if (source === null) continue
+      if (source === null) continue
 
-        let contextInfo = contextInfos.find(e => e.context === context)
-        if (!contextInfo) {
-          contextInfo = {
-            context,
-            sourceLength: source.length,
-            matchTextsPercent: 0
-          }
-
-          contextInfos.push(contextInfo)
-        }
-
-        if (nativeTexts.length === 0) continue
-
-        const htmlDoc = this.loadHtmlFromString(source)
-        const bodyElement = htmlDoc.get('//body')
-        if (!bodyElement) continue
-
-        let bodyString = Utils.getAllText(bodyElement)
-        if (!bodyString) continue
-        bodyString = bodyString.toLowerCase()
-
-        let matchTexts = 0
-        for (const nativeText of nativeTexts) {
-          if (bodyString.includes(nativeText)) matchTexts++
+      let contextInfo = contextInfos.find(e => e.context === context)
+      if (!contextInfo) {
+        contextInfo = {
+          context,
+          sourceLength: source.length,
+          matchTextsPercent: 0
         }
 
-        contextInfo.matchTexts = matchTexts
-        contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
-        if (contextInfo.matchTextsPercent >= 80) {
-          break
-        }
+        contextInfos.push(contextInfo)
+      }
+
+      if (nativeTexts.length === 0) continue
+
+      const htmlDoc = this.loadHtmlFromString(source)
+      const bodyElement = htmlDoc.get('//body')
+      if (!bodyElement) continue
+
+      let bodyString = Utils.getAllText(bodyElement)
+      if (!bodyString) continue
+      bodyString = bodyString.toLowerCase()
+
+      let matchTexts = 0
+      for (const nativeText of nativeTexts) {
+        if (bodyString.includes(nativeText)) matchTexts++
+      }
+
+      contextInfo.matchTexts = matchTexts
+      contextInfo.matchTextsPercent = matchTexts * 100 / nativeTexts.length
+      if (contextInfo.matchTextsPercent >= 80) {
+        break
       }
     }
 
@@ -256,7 +274,7 @@ export default class TestBase {
       catch (ignored) {
         // Try more chance by finding the TopBrowserBar in the xml source.
         const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
-        const webviewElement = nativeDocument.get('(//XCUIElementTypeWebView)[1]')
+        const webviewElement = nativeDocument.get(this.getWebviewXpathSelector())
         if (!webviewElement) {
           throw new Error('Cannot find webview element')
         }
@@ -447,8 +465,11 @@ export default class TestBase {
   }
 
   async findWebview() {
-    const xpathSelector = this._isIos ? '(//XCUIElementTypeWebView)[1]' : '(//android.webkit.WebView)[1]'
-    return await this._findElement(null, xpathSelector)
+    return await this._findElement(null, this.getWebviewXpathSelector())
+  }
+
+  getWebviewXpathSelector() {
+    return this._isIos ? '(//XCUIElementTypeWebView)[1]' : '(//android.webkit.WebView)[1]'
   }
 
   /**
