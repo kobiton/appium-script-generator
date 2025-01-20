@@ -237,8 +237,6 @@ public class TestBase {
     public Rectangle findWebElementRectOnScrollable(By... locators) throws Exception {
         System.out.println(String.format("Finding web element rectangle on scrollable with locator: %s", Utils.getLocatorText(locators)));
         MobileElement foundElement = findElementOnScrollableInContext(true, locators);
-
-        scrollToWebElement(foundElement);
         Rectangle webRectVarName = getWebElementRect(foundElement);
         switchToNativeContext();
         return calculateNativeRect(webRectVarName);
@@ -252,6 +250,7 @@ public class TestBase {
     public void scrollToWebElement(MobileElement element) throws Exception {
         System.out.println(String.format("Scroll to web element %s", element.getTagName()));
         executeScriptOnWebElement(element, "scrollIntoView");
+        sleep(1000);
     }
 
     public Rectangle getWebElementRect(MobileElement element) throws Exception {
@@ -433,6 +432,7 @@ public class TestBase {
                 MobileElement foundElement;
                 if (isWebContext) {
                     foundElement = findVisibleWebElement(locators);
+                    scrollToWebElement(foundElement);
                 }
                 else {
                     foundElement = findElementBy(locators);
