@@ -119,15 +119,30 @@ public class TestBase {
 
     public String switchToWebContextCore() throws Exception {
         List<ContextInfo> contextInfos = new ArrayList<>();
-
         switchToNativeContext();
         Document nativeDocument = loadXMLFromString(driver.getPageSource());
-        String textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
         List<String> nativeTexts = new ArrayList<>();
-        for (Element textElement : nativeDocument.selectXpath(textNodeSelector)) {
-            String textAttr = textElement.attr(isIos ? "value" : "text");
-            textAttr = textAttr.trim().toLowerCase();
-            if (!textAttr.isEmpty()) nativeTexts.add(textAttr);
+        for (Element element : nativeDocument.selectXpath(getWebviewXpathSelector() + "//*")) {
+            if (!element.children().isEmpty()) continue;
+            String text = "";
+            if (isIos) {
+                List<String> excludeTags = Arrays.asList("XCUIElementTypeImage", "XCUIElementTypeSwitch");
+                if (excludeTags.contains(element.tagName())) continue;
+
+                text = element.attr("value");
+                if (text.isEmpty()) {
+                    text = element.attr("label");
+                }
+            }
+            else {
+                text = element.attr("text");
+                if (text.isEmpty() && "android.view.View".equals(element.tagName())) {
+                    text = element.attr("content-desc");
+                }
+            }
+
+            text = text.trim().toLowerCase();
+            if (!text.isEmpty()) nativeTexts.add(text);
         }
 
         Set<String> contexts = driver.getContextHandles();
@@ -261,7 +276,7 @@ public class TestBase {
                 topToolbar = findElementBy(null, 1000, By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
             } catch (Exception ignored) {
                 Document nativeDocument = loadXMLFromString(driver.getPageSource());
-                Element webviewElement = nativeDocument.selectXpath("(//XCUIElementTypeWebView)[1]").first();
+                Element webviewElement = nativeDocument.selectXpath(getWebviewXpathSelector()).first();
                 if (webviewElement == null) {
                     throw new Exception("Cannot find webview element");
                 }
@@ -502,8 +517,11 @@ public class TestBase {
     }
 
     public MobileElement findWebview() {
-        String className = this.isIos ? "XCUIElementTypeWebView" : "android.webkit.WebView";
-        return driver.findElement(By.className(className));
+        return driver.findElement(By.xpath(getWebviewXpathSelector()));
+    }
+
+    public String getWebviewXpathSelector() {
+        return this.isIos ? "(//XCUIElementTypeWebView)[1]" : "(//android.webkit.WebView)[1]";
     }
 
     /**
