@@ -74,9 +74,7 @@ public class TestBase {
         this.deviceName = (String) desiredCaps.getCapability(MobileCapabilityType.DEVICE_NAME);
         this.platformVersion = (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_VERSION);
 
-        if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON) {
-            this.proxy = new ProxyServer();
-        }
+        this.proxy = new ProxyServer();
 
         URL appiumServerUrl = getAppiumServerUrl();
         if (isIos) {
@@ -476,7 +474,8 @@ public class TestBase {
     }
 
     public boolean isButtonElement(MobileElement element) throws Exception {
-        return element.getTagName().contains("Button");
+        String tagName = element.getTagName();
+        return tagName != null && tagName.contains("Button");
     }
 
     public MobileElement findVisibleWebElement(By... locators) throws Exception {
@@ -893,7 +892,7 @@ public class TestBase {
     }
 
     public URL getAppiumServerUrl() throws MalformedURLException {
-        if (proxy != null) {
+        if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON) {
             return new URL(proxy.getServerUrl());
         } else {
             return new URL(Config.APPIUM_SERVER_URL);

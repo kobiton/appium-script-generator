@@ -4,7 +4,7 @@ import org.apache.commons.codec.binary.Base64;
 import org.openqa.selenium.remote.DesiredCapabilities;
 
 public class Config {
-    enum DEVICE_SOURCE_ENUMS {KOBITON, SAUCE_LABS}
+    enum DEVICE_SOURCE_ENUMS {KOBITON, OTHER}
 
     public static final String {{USER_NAME}} = "{{username}}";
     public static final String {{API_KEY}} = "{{your_api_key}}";
