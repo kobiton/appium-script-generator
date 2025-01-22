@@ -230,7 +230,6 @@ export default class TestBase {
   async findWebElementRectOnScrollable(locators) {
     console.log(`Finding web element rectangle on scrollable with locator: ${JSON.stringify(locators)}`)
     const foundElement = await this.findElementOnScrollableInContext(true, locators)
-    await this.scrollToWebElement(foundElement)
     const webRect = await this.getWebElementRect(foundElement)
     await this.switchToNativeContext()
     return await this.calculateNativeRect(webRect)
@@ -245,6 +244,7 @@ export default class TestBase {
   async scrollToWebElement(element) {
     console.log(`Scroll to web element, ${JSON.stringify(element)}`)
     await this.executeScriptOnWebElement(element, 'scrollIntoView')
+    await this.sleep(1000)
   }
 
   async getWebElementRect(element) {
@@ -397,6 +397,7 @@ export default class TestBase {
       let foundElement
       if (isWebContext) {
         foundElement = await this.findVisibleWebElement(locators)
+        await this.scrollToWebElement(foundElement)
       }
       else {
         foundElement = await this.findElementBy(Config.implicitWaitInMs, locators)

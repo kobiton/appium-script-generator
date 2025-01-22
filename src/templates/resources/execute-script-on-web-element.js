@@ -6,14 +6,11 @@ switch (command) {
     const visible = !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
     return visible ? 'true': 'false'
   case "scrollIntoView":
-    const elementRect = element.getBoundingClientRect()
-    const absoluteElementTop = elementRect.top + window.pageYOffset
-    const middle = absoluteElementTop - (window.innerHeight / 2)
-    window.scrollTo({
-      top: middle,
-      left: window.pageXOffset
+    element.scrollIntoView({
+      behavior: "auto",
+      block: "center",
+      inline: "center"
     })
-
     return true
   case "getBoundingClientRect":
     const {devicePixelRatio} = window

@@ -267,8 +267,6 @@ namespace AppiumTest
         {
             Log($"Finding web element rectangle on scrollable with locator: {Utils.GetLocatorText(locators)}");
             var foundElement = FindElementOnScrollableInContext(true, locators);
-
-            ScrollToWebElement(foundElement);
             var webRect = GetWebElementRect(foundElement);
             SwitchToNativeContext();
             return CalculateNativeRect(webRect);
@@ -284,6 +282,7 @@ namespace AppiumTest
         {
             Log($"Scroll to web element {element.TagName}");
             ExecuteScriptOnWebElement(element, "scrollIntoView");
+            sleep(1000);
         }
 
         public Rectangle GetWebElementRect(AppiumWebElement element)
@@ -515,6 +514,7 @@ namespace AppiumTest
                     if (isWebContext)
                     {
                         foundElement = FindVisibleWebElement(locators);
+                        ScrollToWebElement(foundElement);
                     }
                     else
                     {
