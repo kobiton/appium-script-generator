@@ -109,21 +109,41 @@ namespace AppiumTest
 
             SwitchToNativeContext();
             XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-            string textNodeSelector = isIos ? "//XCUIElementTypeStaticText" : "//android.widget.TextView";
             List<string> nativeTexts = new List<string>();
-            var textNodes = nativeDocument.SelectNodes(textNodeSelector);
+            var textNodes = nativeDocument.SelectNodes(GetWebviewXpathSelector() + "//*");
 
             if (textNodes != null)
             {
                 foreach (XmlNode element in textNodes)
                 {
                     if (element.NodeType != XmlNodeType.Element) continue;
-                    string? textAttr = element.Attributes?[isIos ? "value" : "text"]?.Value;
-                    if (textAttr == null)
-                        textAttr = "";
-                    textAttr = textAttr.Trim().ToLower();
-                    if (!string.IsNullOrEmpty(textAttr))
-                        nativeTexts.Add(textAttr);
+                    if (element.ChildNodes.Count != 0) continue;
+                    XmlAttribute? textAttr;
+                    if (isIos)
+                    {
+                        var excludeTags = new List<string> { "XCUIElementTypeImage", "XCUIElementTypeSwitch" };
+                        if (excludeTags.Contains(element.Name)) continue;
+
+                        textAttr = element.Attributes?["value"];
+                        if (textAttr == null || string.IsNullOrEmpty(textAttr.Value))
+                        {
+                            textAttr = element.Attributes?["label"];
+                        }
+                    }
+                    else
+                    {
+                        textAttr = element.Attributes?["text"];
+                        if ((textAttr == null || string.IsNullOrEmpty(textAttr.Value)) &&
+                            "android.view.View".Equals(element.Name))
+                        {
+                            textAttr = element.Attributes?["content-desc"];
+                        }
+                    }
+
+                    var text = textAttr != null ? textAttr.Value : "";
+                    text = text.Trim().ToLower();
+                    if (!string.IsNullOrEmpty(text))
+                        nativeTexts.Add(text);
                 }
             }
 
@@ -247,8 +267,6 @@ namespace AppiumTest
         {
             Log($"Finding web element rectangle on scrollable with locator: {Utils.GetLocatorText(locators)}");
             var foundElement = FindElementOnScrollableInContext(true, locators);
-
-            ScrollToWebElement(foundElement);
             var webRect = GetWebElementRect(foundElement);
             SwitchToNativeContext();
             return CalculateNativeRect(webRect);
@@ -264,6 +282,7 @@ namespace AppiumTest
         {
             Log($"Scroll to web element {element.TagName}");
             ExecuteScriptOnWebElement(element, "scrollIntoView");
+            sleep(1000);
         }
 
         public Rectangle GetWebElementRect(AppiumWebElement element)
@@ -302,7 +321,7 @@ namespace AppiumTest
                 catch (Exception ignored)
                 {
                     XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
-                    XmlNode webviewNode = nativeDocument.SelectSingleNode("(//XCUIElementTypeWebView)[1]");
+                    XmlNode webviewNode = nativeDocument.SelectSingleNode(GetWebviewXpathSelector());
                     if (webviewNode == null)
                     {
                         throw new Exception("Cannot find webview element");
@@ -495,6 +514,7 @@ namespace AppiumTest
                     if (isWebContext)
                     {
                         foundElement = FindVisibleWebElement(locators);
+                        ScrollToWebElement(foundElement);
                     }
                     else
                     {
@@ -592,8 +612,12 @@ namespace AppiumTest
 
         public AppiumWebElement FindWebview()
         {
-            string className = isIos ? "XCUIElementTypeWebView" : "android.webkit.WebView";
-            return driver.FindElement(By.ClassName(className));
+            return driver.FindElement(By.XPath(GetWebviewXpathSelector()));
+        }
+
+        public String GetWebviewXpathSelector()
+        {
+            return isIos ? "(//XCUIElementTypeWebView)[1]" : "(//android.webkit.WebView)[1]";
         }
 
         /**
