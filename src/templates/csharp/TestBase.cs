@@ -53,11 +53,8 @@ namespace AppiumTest
             this.platformVersion = desiredCaps.ToCapabilities().GetCapability(MobileCapabilityType.PlatformVersion)
                 .ToString();
 
-            if (Config.DeviceSource == Config.DeviceSourceEnums.Kobiton)
-            {
-                proxy = new ProxyServer();
-                proxy.StartProxy();
-            }
+            proxy = new ProxyServer();
+            proxy.StartProxy();
 
             Uri appiumServerUrl = GetAppiumServerUrl();
             if (isIos)
@@ -280,7 +277,7 @@ namespace AppiumTest
 
         public void ScrollToWebElement(AppiumWebElement element)
         {
-            Log($"Scroll to web element {element.TagName}");
+            Log($"Scroll to web element {GetTagOfElement(element)}");
             ExecuteScriptOnWebElement(element, "scrollIntoView");
             sleep(1000);
         }
@@ -583,7 +580,8 @@ namespace AppiumTest
 
         public bool IsButtonElement(AppiumWebElement element)
         {
-            return element.TagName.Contains("Button");
+            var tagName = GetTagOfElement(element);
+            return tagName != null && tagName.Contains("Button");
         }
 
         public AppiumWebElement FindVisibleWebElement(params By[] locators)
@@ -625,7 +623,7 @@ namespace AppiumTest
          */
         public TouchAction TouchAtCenterOfElement(AppiumWebElement element)
         {
-            Log($"Touch at center of element {element.TagName}");
+            Log($"Touch at center of element {GetTagOfElement(element)}");
 
             TouchAction action = new TouchAction(driver);
             action.Tap(element);
@@ -653,7 +651,7 @@ namespace AppiumTest
          */
         public void ClickElement(AppiumWebElement element)
         {
-            Log($"Click on element with type: {element.TagName}");
+            Log($"Click on element with type: {GetTagOfElement(element)}");
             element.Click();
         }
 
@@ -663,7 +661,7 @@ namespace AppiumTest
         public TouchAction TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX,
             double relativePointY)
         {
-            Log($"Touch on element {element.TagName} at relative point ({relativePointX} {relativePointY})");
+            Log($"Touch on element {GetTagOfElement(element)} at relative point ({relativePointX} {relativePointY})");
 
             return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
         }
@@ -811,7 +809,7 @@ namespace AppiumTest
                     new StringContent(requestJson.ToString(), Encoding.UTF8, "application/json");
 
                 var sendKeysRequest = new HttpRequestMessage(HttpMethod.Post,
-                    $"{GetAppiumServerUrl()}session/{driver.SessionId}/keys")
+                    $"{GetAppiumServerUrl()}/session/{driver.SessionId}/keys")
                 {
                     Content = requestBody
                 };
@@ -847,7 +845,7 @@ namespace AppiumTest
 
         public void SendKeys(AppiumWebElement element, string keys)
         {
-            Log($"Send keys '{keys}' on element {element.TagName}");
+            Log($"Send keys '{keys}' on element {GetTagOfElement(element)}");
 
             element.SendKeys(keys);
         }
@@ -1137,15 +1135,27 @@ namespace AppiumTest
             return center;
         }
 
+        public string? GetTagOfElement(AppiumWebElement element)
+        {
+            try
+            {
+                return element.TagName;
+            }
+            catch (Exception ignored)
+            {
+                return null;
+            }
+        }
+
         public Uri GetAppiumServerUrl()
         {
-            if (proxy != null)
+            if (Config.DeviceSource == Config.DeviceSourceEnums.Kobiton)
             {
                 return new Uri(this.proxy.GetServerUrl());
             }
             else
             {
-                return new Uri($"{Config.AppiumServerUrl}/");
+                return new Uri(Config.GetAppiumServerUrlWithAuth());
             }
         }
 

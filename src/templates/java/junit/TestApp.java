@@ -18,9 +18,9 @@ public class TestApp extends TestBase {
     @Before
     public void beforeTest() throws Exception {
         Assert.assertNotEquals(
-            "Please update value for the KOBITON_API_KEY constant first. See more at README.md file.",
-            "your_kobiton_api_key",
-            Config.KOBITON_API_KEY
+            "Please update value for the API_KEY constant first. See more at README.md file.",
+            "your_api_key",
+            Config.API_KEY
         );
     }
 

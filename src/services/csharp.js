@@ -563,11 +563,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     if (DEVICE_SOURCES.KOBITON === deviceSource) {
       const kobitonApiUrl = new URL(serverInfo.apiUrl)
-      appiumServerUrl =
-        // eslint-disable-next-line max-len
-        `"${kobitonApiUrl.protocol}//" + KobitonUserName + ":" + KobitonApiKey + "@${kobitonApiUrl.host}/wd/hub"`
-      configCode = configCode.replace('{{USER_NAME}}', 'KobitonUserName')
-      configCode = configCode.replace('{{API_KEY}}', 'KobitonApiKey')
+      appiumServerUrl = `"${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub"`
       configCode = configCode.replace('{{your_api_key}}', serverInfo.apiKey)
       configCode = configCode.replace('{{username}}', serverInfo.username)
       configCode = configCode.replace('{{KobitonApiUrl}}', serverInfo.apiUrl)
@@ -578,7 +574,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       additionalConfig.push(
         new Line('public static String KobitonUserName = "{{kobiton_username}}";'))
       additionalConfig.push(
-        new Line('public static String KobitonApiKey = "your_kobiton_api_key";', 1))
+        new Line('public static String KobitonApiKey = "your_api_key";', 1))
       configCode = configCode.replace(
         '{{kobitonCredential}}', this._buildCSharpCode(additionalConfig, 0))
 
@@ -591,8 +587,6 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       appiumServerUrl =
         // eslint-disable-next-line max-len
         `"${sauceLabsApiUrl.protocol}//" + SauceLabsUserName + ":" + SauceLabsApiKey + "@ondemand.${sauceLabs.region}.${sauceLabsApiUrl.host}:443/wd/hub"`
-      configCode = configCode.replace('{{USER_NAME}}', 'SauceLabsUserName')
-      configCode = configCode.replace('{{API_KEY}}', 'SauceLabsApiKey')
       configCode = configCode.replace('{{kobiton_username}}', serverInfo.username)
       configCode = configCode.replace('{{username}}', sauceLabs.username)
       configCode = configCode.replace('{{your_api_key}}', 'your_sauce_labs_api_key')

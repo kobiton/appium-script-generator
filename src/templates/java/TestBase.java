@@ -30,7 +30,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.openqa.selenium.*;
 import org.openqa.selenium.interactions.KeyInput;
-import org.openqa.selenium.interactions.Pause;
 import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
 import org.openqa.selenium.remote.DesiredCapabilities;
@@ -461,10 +460,10 @@ public class TestBase {
 
                 if (!swipedToTop) {
                     hideKeyboard();
-                    swipeToTop(scrollableElement.getCenter());
+                    swipeToTop(getCenterOfElement(scrollableElement));
                     swipedToTop = true;
                 } else {
-                    Point center = scrollableElement.getCenter();
+                    Point center = getCenterOfElement(scrollableElement);
                     Rectangle rect = scrollableElement.getRect();
                     // Fix bug when scrollableElement is out of viewport
                     if (center.y > screenSize.y || rect.height < 0) {
@@ -896,6 +895,11 @@ public class TestBase {
         return getClass().getClassLoader().getResourceAsStream(path);
     }
 
+    public Point getCenterOfElement(MobileElement element) {
+        Rectangle rect = element.getRect();
+        return new Point(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+
     public Point getCenterOfRect(Rectangle rect) {
         Point center = new Point(rect.x + rect.width / 2, rect.y + rect.height / 2);
         return center;
@@ -913,7 +917,7 @@ public class TestBase {
         if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON) {
             return new URL(proxy.getServerUrl());
         } else {
-            return new URL(Config.APPIUM_SERVER_URL);
+            return new URL(Config.getAppiumServerUrlWithAuth());
         }
     }
 

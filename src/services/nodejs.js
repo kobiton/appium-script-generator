@@ -532,15 +532,13 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     let configCode
     const kobitonApiUrl = new URL(serverInfo.apiUrl)
-    const appiumServerUrl =
-      // eslint-disable-next-line max-len, no-template-curly-in-string
-      `\`${kobitonApiUrl.protocol}//` + '${KOBITON_USERNAME}' + ':' + '${KOBITON_API_KEY}' + `@${kobitonApiUrl.host}\``
+    const appiumServerUrl = `${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub`
     configCode = await readFile(path.join(templateScriptDir, 'src/test/config.js'), 'utf8')
     configCode = configCode.replace('{{username}}', serverInfo.username)
     configCode = configCode.replace(
       '//{{desiredCaps}}', this._buildNodejsCode(desiredCapsMethodLines, 1))
-    configCode = configCode.replace('//{{appiumServerUrl}}', appiumServerUrl)
-    configCode = configCode.replace('//{{kobitonApiUrl}}', `'${serverInfo.apiUrl}'`)
+    configCode = configCode.replace('{{appiumServerUrl}}', appiumServerUrl)
+    configCode = configCode.replace('{{kobitonApiUrl}}', serverInfo.apiUrl)
 
     let readmeText = await readFile(path.join(templateScriptDir, 'README.md'), 'utf8')
     readmeText = readmeText.replace(/{{portalUrl}}/g, serverInfo.portalUrl)
