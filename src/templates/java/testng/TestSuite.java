@@ -15,14 +15,5 @@ public class TestSuite {
         );
     }
 
-    @Test
-    public void testOnPixel4XLAndroid13() throws Exception {
-        TestApp testApp = new TestApp();
-        DesiredCapabilities capabilities = Config.getPixel4XLAndroid13DesiredCapabilities();
-        testApp.findOnlineDevice(capabilities);
-        testApp.setup(capabilities, 1);
-        testApp.runTest();
-    }
-
-
+    {{testCases}}
 }
