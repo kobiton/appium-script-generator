@@ -27,7 +27,7 @@ namespace AppiumTest
                 listener.Start();
                 while (listener.IsListening) {
                     var context = await listener.GetContextAsync();
-                    await Task.Run(() => HandleRequest(context, Config.AppiumServerUrl));
+                    await Task.Run(() => HandleRequest(context, Config.GetAppiumServerUrlWithAuth()));
                 }
             }
             catch (Exception ex)

@@ -1,7 +1,7 @@
 import httpProxy from 'http-proxy'
 import http from 'http'
 import net from 'net'
-import Config from '../config'
+import {Config} from '../config'
 
 export default class Proxy {
   constructor() {
@@ -12,8 +12,8 @@ export default class Proxy {
 
   async start() {
     this._proxy = httpProxy.createProxyServer({
-      proxyTimeout: Config.newCommandTimeoutInMs,
-      timeout: Config.newCommandTimeoutInMs
+      proxyTimeout: Config.NEW_COMMAND_TIMEOUT_IN_MS,
+      timeout: Config.NEW_COMMAND_TIMEOUT_IN_MS
     })
 
     const server = http.createServer((req, res) => {
@@ -21,7 +21,7 @@ export default class Proxy {
       this.currentCommandId && url.searchParams.set('baseCommandId', this.currentCommandId)
       req.url = url.toString().replace(this.getServerUrl(), '')
       this._proxy.web(req, res, {
-        target: Config.appiumServerUrl,
+        target: Config.getAppiumServerUrlWithAuth().replace('/wd/hub', ''),
         secure: false,
         changeOrigin: true
       })

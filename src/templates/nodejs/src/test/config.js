@@ -1,31 +1,28 @@
 import {DEVICE_SOURCES} from './helper/constants'
 
-// Please update the correct value for KOBITON_API_KEY before testing
-const KOBITON_API_KEY = 'your_kobiton_api_key'
-const KOBITON_USERNAME = '{{username}}'
+export const Config = {
+  API_USERNAME: '{{username}}',
+  API_KEY: 'your_api_key',
+  APPIUM_SERVER_URL: '{{appiumServerUrl}}',
+  DEVICE_SOURCE: DEVICE_SOURCES.KOBITON,
+  IMPLICIT_WAIT_IN_MS: 10000,
+  DEVICE_WAITING_MAX_TRY_TIMES: 5,
+  DEVICE_WAITING_INTERVAL_IN_MS: 30000,
+  NEW_COMMAND_TIMEOUT_IN_MS: 15 * 60 * 1000,
+  SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS: 3000,
+  KOBITON_API_URL: '{{kobitonApiUrl}}',
 
-class Config {
-  constructor() {
-    this.kobitonUsername = KOBITON_USERNAME
-    this.kobitonApiKey = KOBITON_API_KEY
-    this.appiumServerUrl = //{{appiumServerUrl}}
-    this.kobitonApiUrl = //{{kobitonApiUrl}}
-    this.deviceSource = DEVICE_SOURCES.KOBITON
-    this.implicitWaitInMs = 10000 // 10s
-    this.newCommandTimeoutInMs = 15 * 60 * 1000 // 15m
-    this.sleepBeforeSendingKeysInMs = 3000 // 3s
-    this.deviceWaitingMaxTryTimes = 5
-    this.deviceWaitingIntervalInMs = 30000 // 30s
-  }
+  getAppiumServerUrlWithAuth() {
+    const url = new URL(this.APPIUM_SERVER_URL)
+    return `${url.protocol}//${this.API_USERNAME}:${this.API_KEY}@${url.hostname}:${url.port}${url.pathname}`
+  },
 
   getBasicAuthString() {
-    const authen = `${KOBITON_USERNAME}:${KOBITON_API_KEY}`
+    const authen = `${this.API_USERNAME}:${this.API_KEY}`
     const encodedAuthen = Buffer.from(authen).toString('base64')
 
     return `Basic ${encodedAuthen}`
-  }
+  },
 
   //{{desiredCaps}}
 }
-
-export default new Config()

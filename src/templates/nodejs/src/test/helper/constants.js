@@ -1,6 +1,6 @@
 export const DEVICE_SOURCES = {
   KOBITON: 'KOBITON',
-  SAUCE_LABS: 'SAUCE_LABS'
+  OTHER: 'OTHER'
 }
 
 export const PRESS_TYPES = {

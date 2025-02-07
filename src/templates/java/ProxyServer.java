@@ -111,7 +111,7 @@ public class ProxyServer extends NanoHTTPD {
             uri = uri.replace("/wd/hub", "");
         }
 
-        URIBuilder uriBuilder = new URIBuilder(Config.APPIUM_SERVER_URL + uri);
+        URIBuilder uriBuilder = new URIBuilder(Config.getAppiumServerUrlWithAuth() + uri);
         if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON && currentCommandId > 0) {
             uriBuilder.addParameter("baseCommandId", String.valueOf(currentCommandId));
         }

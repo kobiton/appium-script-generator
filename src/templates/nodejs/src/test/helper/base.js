@@ -12,7 +12,7 @@ import Utils from './utils'
 import Proxy from './proxy'
 import Rectangle from './rectangle'
 import Point from './point'
-import Config from '../config'
+import {Config} from '../config'
 import {DEVICE_SOURCES, PRESS_TYPES} from './constants'
 
 const NATIVE_CONTEXT = 'NATIVE_APP'
@@ -47,15 +47,21 @@ export default class TestBase {
     this._deviceName = get(desiredCaps, MOBILE_CAPABILITY_TYPES.DEVICE_NAME, '')
     this._platformVersion = get(desiredCaps, MOBILE_CAPABILITY_TYPES.PLATFORM_NAME, '')
 
-    if (Config.deviceSource === DEVICE_SOURCES.KOBITON) {
-      this._proxy = new Proxy()
-      await this._proxy.start()
-    }
+    this._proxy = new Proxy()
+    await this._proxy.start()
 
     console.log(`Initialize Appium driver with desiredCaps: ${JSON.stringify(desiredCaps)}`)
-    const options = this._buildOptions(desiredCaps)
-    this._driver = remote(options)
+    const url = new URL(this.getAppiumServerUrl())
+    const options = {
+      protocol: url.protocol.replace(':', ''),
+      host: url.hostname,
+      port: url.port,
+      user: Config.API_USERNAME,
+      key: Config.API_KEY,
+      desiredCapabilities: desiredCaps
+    }
 
+    this._driver = remote(options)
     return this._driver.init()
   }
 
@@ -335,7 +341,7 @@ export default class TestBase {
     if (locators.length === 1) {
       await this.setImplicitWaitInMiliSecond(timeout)
       const elements = await this._findElements(null, locators[0])
-      await this.setImplicitWaitInMiliSecond(Config.implicitWaitInMs)
+      await this.setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS)
 
       if (multiple && !isEmpty(elements)) {
         return elements
@@ -365,14 +371,14 @@ export default class TestBase {
           catch (ignored) {}
         }
 
-        await this.setImplicitWaitInMiliSecond(Config.implicitWaitInMs)
+        await this.setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS)
         throw new Error(notFoundMessage)
       }, null, timeout / (waitInterval * 1000), waitInterval * 1000)
     }
   }
 
   async findElementBy(timeout, locators) {
-    const foundElements = await this.findElements(null, Math.max(Config.implicitWaitInMs, timeout), false, locators)
+    const foundElements = await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), false, locators)
     if (!foundElements || foundElements.length !== 1) {
       throw new Error(`Cannot find element by: ${JSON.stringify(locators)}`)
     }
@@ -381,7 +387,7 @@ export default class TestBase {
   }
 
   async findElementsBy(timeout, locators) {
-    return await this.findElements(null, Math.max(Config.implicitWaitInMs, timeout), true, locators)
+    return await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), true, locators)
   }
 
   async findElementOnScrollableInContext(isWebContext, locators) {
@@ -400,7 +406,7 @@ export default class TestBase {
         await this.scrollToWebElement(foundElement)
       }
       else {
-        foundElement = await this.findElementBy(Config.implicitWaitInMs, locators)
+        foundElement = await this.findElementBy(Config.IMPLICIT_WAIT_IN_MS, locators)
       }
 
       const rect = await this.getRect(foundElement)
@@ -456,7 +462,7 @@ export default class TestBase {
 
   async findVisibleWebElement(locators) {
     console.log(`Finding visible web element with locators ${JSON.stringify(locators)}`)
-    const foundElements = await this.findElementsBy(Config.implicitWaitInMs, locators)
+    const foundElements = await this.findElementsBy(Config.IMPLICIT_WAIT_IN_MS, locators)
 
     let visibleElement = null
     for (const element of foundElements) {
@@ -496,15 +502,20 @@ export default class TestBase {
    * Handle event touch element
    */
   async touchOnElement(element, relativePointX, relativePointY) {
-    await this.touchAtRelativePointOfElement(element, relativePointX, relativePointY)
+    if (await this.isButtonElement(element)) {
+      await this.clickElement(element)
+    }
+    else {
+      await this.touchAtRelativePointOfElement(element, relativePointX, relativePointY)
+    }
   }
 
   /**
    * Click element (element need to be visible)
    */
   async clickElement(element) {
-    console.log(`Click on element with type`)
-    return this._driver.elementIdClick(element.getId())
+    console.log('Click on element')
+    return this._driver.elementIdClick(element.ELEMENT)
   }
 
   /**
@@ -619,7 +630,7 @@ export default class TestBase {
 
   async sendKeys(keys) {
     console.log(`Send keys: ${keys}`)
-    await this.sleep(Config.sleepBeforeSendingKeysInMs)
+    await this.sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS)
 
     if (this._isIos) {
       await this._driver.keys(keys)
@@ -784,6 +795,11 @@ export default class TestBase {
     return (await this._driver.elementIdSize(element.ELEMENT)).value
   }
 
+  async isButtonElement(element) {
+    const tagName = (await this._driver.elementIdName(element.ELEMENT)).value
+    return tagName && tagName.includes('Button')
+  }
+
   async getAbsolutePoint(relativePointX, relativePointY) {
     const screenSize = await this.getScreenSize()
 
@@ -881,8 +897,16 @@ export default class TestBase {
     }
   }
 
+  getAppiumServerUrl() {
+    if (Config.DEVICE_SOURCE === DEVICE_SOURCES.KOBITON) {
+      return this._proxy.getServerUrl()
+    } else {
+      return Config.getAppiumServerUrlWithAuth()
+    }
+  }
+
   async getAvailableDevice(capabilities) {
-    const deviceListUri = `${Config.kobitonApiUrl}/v1/devices`
+    const deviceListUri = `${Config.KOBITON_API_URL}/v1/devices`
     const params = {
       isOnline: true,
       isBooked: false,
@@ -920,7 +944,7 @@ export default class TestBase {
   }
 
   async findOnlineDevice(capabilities) {
-    if (Config.deviceSource !== DEVICE_SOURCES.KOBITON) {
+    if (Config.DEVICE_SOURCE !== DEVICE_SOURCES.KOBITON) {
       return null
     }
 
@@ -931,7 +955,7 @@ export default class TestBase {
     const platformVersion = get(capabilities, MOBILE_CAPABILITY_TYPES.PLATFORM_VERSION)
     const platformName = get(capabilities, MOBILE_CAPABILITY_TYPES.PLATFORM_NAME)
 
-    while (tryTime <= Config.deviceWaitingMaxTryTimes) {
+    while (tryTime <= Config.DEVICE_WAITING_MAX_TRY_TIMES) {
       console.log(`Is device with capabilities: (deviceName: ${deviceName}, deviceGroup: ${deviceGroup}, platformName: ${platformName}, platformVersion: ${platformVersion}) online? Retrying at ${Utils.convertToOrdinal(tryTime)} time`)
 
       device = await this.getAvailableDevice(capabilities)
@@ -941,7 +965,7 @@ export default class TestBase {
       }
 
       tryTime++
-      await this.sleep(Config.deviceWaitingIntervalInMs)
+      await this.sleep(Config.DEVICE_WAITING_INTERVAL_IN_MS)
     }
 
     if (device === null) {
@@ -960,7 +984,7 @@ export default class TestBase {
     }
 
     const {body} = await axios.get(
-      `${Config.kobitonApiUrl}/v1/app/versions/${appVersionId}/downloadUrl`,
+      `${Config.KOBITON_API_URL}/v1/app/versions/${appVersionId}/downloadUrl`,
       config
     )
 
@@ -1068,18 +1092,5 @@ export default class TestBase {
     }
 
     return result
-  }
-
-  _buildOptions(desiredCaps) {
-    const options = {
-      protocol: 'http',
-      host: 'localhost',
-      port: this._proxy.listeningPort,
-      user: Config.kobitonUsername,
-      key: Config.kobitonApiKey,
-      desiredCapabilities: desiredCaps
-    }
-
-    return options
   }
 }

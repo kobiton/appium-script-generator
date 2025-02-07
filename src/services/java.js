@@ -595,12 +595,8 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
     if (DEVICE_SOURCES.KOBITON === deviceSource) {
       const kobitonApiUrl = new URL(serverInfo.apiUrl)
-      appiumServerUrl =
-        // eslint-disable-next-line max-len
-        `"${kobitonApiUrl.protocol}//" + KOBITON_USERNAME + ":" + KOBITON_API_KEY + "@${kobitonApiUrl.host}/wd/hub"`
-      configCode = configCode.replace('{{USER_NAME}}', 'KOBITON_USERNAME')
-      configCode = configCode.replace('{{API_KEY}}', 'KOBITON_API_KEY')
-      configCode = configCode.replace('{{your_api_key}}', 'your_kobiton_api_key')
+      appiumServerUrl = `"${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub"`
+      configCode = configCode.replace('{{your_api_key}}', 'your_api_key')
       configCode = configCode.replace('{{username}}', serverInfo.username)
       configCode = configCode.replace('{{kobitonCredential}}', '')
     }
