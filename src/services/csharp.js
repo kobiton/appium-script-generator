@@ -564,7 +564,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
     if (DEVICE_SOURCES.KOBITON === deviceSource) {
       const kobitonApiUrl = new URL(serverInfo.apiUrl)
       appiumServerUrl = `"${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub"`
-      configCode = configCode.replace('{{your_api_key}}', serverInfo.apiKey)
+      configCode = configCode.replace('{{your_api_key}}', 'your_api_key')
       configCode = configCode.replace('{{username}}', serverInfo.username)
       configCode = configCode.replace('{{KobitonApiUrl}}', serverInfo.apiUrl)
       configCode = configCode.replace('{{kobitonCredential}}', '')

@@ -31,7 +31,7 @@ namespace AppiumTest
 
         public static string GetBasicAuthString()
         {
-            string authString = KobitonUserName + ":" + KobitonApiKey;
+            string authString = ApiUsername + ":" + ApiKey;
             byte[] authEncBytes = System.Text.Encoding.UTF8.GetBytes(authString);
             string authEncString = Convert.ToBase64String(authEncBytes);
             return "Basic " + authEncString;

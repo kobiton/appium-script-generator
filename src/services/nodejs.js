@@ -534,6 +534,7 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
     const kobitonApiUrl = new URL(serverInfo.apiUrl)
     const appiumServerUrl = `${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub`
     configCode = await readFile(path.join(templateScriptDir, 'src/test/config.js'), 'utf8')
+    configCode = configCode.replace('{{your_api_key}}', 'your_api_key')
     configCode = configCode.replace('{{username}}', serverInfo.username)
     configCode = configCode.replace(
       '//{{desiredCaps}}', this._buildNodejsCode(desiredCapsMethodLines, 1))
