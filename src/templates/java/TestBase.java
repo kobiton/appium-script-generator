@@ -683,33 +683,21 @@ public class TestBase {
         System.out.println(String.format("Send keys: %s", keys));
         sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS);
 
-        if (this.isIos) {
-            char[] chars = keys.toCharArray();
-            JsonObject requestJson = new JsonObject();
-            requestJson.add("value", gson.toJsonTree(chars).getAsJsonArray());
-            RequestBody requestBody = RequestBody.create(MediaType.parse("application/json"), requestJson.toString());
-
-            Request.Builder sendKeysBuilder = new Request.Builder()
-                .post(requestBody)
-                .url(getAppiumServerUrl() + String.format("/session/%s/keys", driver.getSessionId()));
-
-            try (Response response = httpClient.newCall(sendKeysBuilder.build()).execute()) {
-                if (!Utils.isStatusCodeSuccess(response.code())) {
-                    throw new Exception(response.body().string());
-                }
+        try {
+            KeyInput keyInput = new KeyInput("keyboard");
+            Sequence sequence = new Sequence(keyInput, 0);
+            for (int index = 0; index < keys.length(); index++) {
+                int codePoint = Character.codePointAt(keys, index);
+                sequence.addAction(keyInput.createKeyDown(codePoint));
+                sequence.addAction(keyInput.createKeyUp(codePoint));
             }
-        } else {
-            try {
-                KeyInput keyInput = new KeyInput("keyboard");
-                Sequence sequence = new Sequence(keyInput, 0);
-                for (int index = 0; index < keys.length(); index++) {
-                    int codePoint = Character.codePointAt(keys, index);
-                    sequence.addAction(keyInput.createKeyDown(codePoint));
-                    sequence.addAction(keyInput.createKeyUp(codePoint));
-                }
 
-                driver.perform(Arrays.asList(sequence));
-            } catch (Exception ignored) {
+            driver.perform(Arrays.asList(sequence));
+        } catch (Exception ignored) {
+            if (this.isIos) {
+                getIosDriver().getKeyboard().sendKeys(keys);
+            }
+            else {
                 getAndroidDriver().getKeyboard().sendKeys(keys);
             }
         }

@@ -632,19 +632,13 @@ export default class TestBase {
     console.log(`Send keys: ${keys}`)
     await this.sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS)
 
-    if (this._isIos) {
-      await this._driver.keys(keys)
-    }
-    // Use POST /actions api for Android
-    else {
-      const chars = [...keys]
-      const actions = flatten(chars.map((char) => [
-        {type: 'keyDown', value: char},
-        {type: 'keyUp', value: char}
-      ]))
+    const chars = [...keys]
+    const actions = flatten(chars.map((char) => [
+      {type: 'keyDown', value: char},
+      {type: 'keyUp', value: char}
+    ]))
 
-      await this._driver.actions([{type: 'key', id: 'keyboard', actions}])
-    }
+    await this._driver.actions([{type: 'key', id: 'keyboard', actions}])
   }
 
   async clearTextField(maxChars) {
