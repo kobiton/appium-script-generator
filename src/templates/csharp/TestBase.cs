@@ -797,47 +797,27 @@ namespace AppiumTest
             Log($"Send keys: {keys}");
             sleep(Config.SleepTimeBeforeSendKeysInMs);
 
-            if (isIos)
+            try
             {
-                var chars = keys.ToCharArray();
-                var requestJson = new JObject
+                KeyInputDevice keyInput = new KeyInputDevice("keyboard");
+                ActionSequence sequence = new ActionSequence(keyInput, 0);
+                for (int index = 0; index < keys.Length; index++)
                 {
-                    ["value"] = JArray.FromObject(chars)
-                };
-
-                StringContent requestBody =
-                    new StringContent(requestJson.ToString(), Encoding.UTF8, "application/json");
-
-                var sendKeysRequest = new HttpRequestMessage(HttpMethod.Post,
-                    $"{GetAppiumServerUrl()}/session/{driver.SessionId}/keys")
-                {
-                    Content = requestBody
-                };
-
-                var response = httpClient.SendAsync(sendKeysRequest).Result;
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new Exception(response.Content.ReadAsStringAsync().Result);
+                    var charAt = keys[index];
+                    sequence.AddAction(keyInput.CreateKeyDown(charAt));
+                    sequence.AddAction(keyInput.CreateKeyUp(charAt));
                 }
+
+                driver.PerformActions(new List<ActionSequence> { sequence });
             }
-            else
+            catch (Exception ignored)
             {
-                try
+                if (isIos)
                 {
-                    KeyInputDevice keyInput = new KeyInputDevice("keyboard");
-                    ActionSequence sequence = new ActionSequence(keyInput, 0);
-                    for (int index = 0; index < keys.Length; index++)
-                    {
-                        var charAt = keys[index];
-                        sequence.AddAction(keyInput.CreateKeyDown(charAt));
-                        sequence.AddAction(keyInput.CreateKeyUp(charAt));
-                    }
-
-                    driver.PerformActions(new List<ActionSequence> { sequence });
+                    GetIosDriver().Keyboard.SendKeys(keys);
                 }
-                catch (Exception ignored)
+                else
                 {
-                    Log(ignored.ToString());
                     GetAndroidDriver().Keyboard.SendKeys(keys);
                 }
             }
