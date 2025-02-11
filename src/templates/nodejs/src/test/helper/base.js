@@ -652,10 +652,22 @@ export default class TestBase {
     switch (type) {
       case PRESS_TYPES.HOME:
         if (this._isIos) {
-          const isLocked = (await this._driver.isLocked()).value
-          isLocked === true && await this._driver.unlock()
+          let needPressHome = true
+          try {
+            // isLocked() and unlock() could failed on some devices
+            const isLocked = (await this._driver.isLocked()).value
+            if (isLocked === true) {
+              await this._driver.unlock()
+              needPressHome = false
+            }
+          }
+          catch (err) {
+            console.log(`Cannot check device locked or unlock device, error: ${err.message}`)
+          }
 
-          await this._driver.execute('mobile: pressButton', {name: 'home'})
+          if (needPressHome) {
+            await this._driver.execute('mobile: pressButton', {name: 'home'})
+          }
         }
         else {
           await this._driver.pressKeycode('3')
