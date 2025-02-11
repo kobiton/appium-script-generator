@@ -845,12 +845,23 @@ namespace AppiumTest
                 case PressTypes.Home:
                     if (isIos)
                     {
-                        IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
-                        if (iosDriver.IsLocked())
+                        var needPressHome = true;
+                        try
                         {
-                            iosDriver.Unlock();
+                            IOSDriver<AppiumWebElement> iosDriver = GetIosDriver();
+                            // IsLocked() and Unlock() could failed on some devices
+                            if (iosDriver.IsLocked())
+                            {
+                                iosDriver.Unlock();
+                                needPressHome = false;
+                            }
                         }
-                        else
+                        catch (Exception ex)
+                        {
+                            Log($"Cannot check device locked or unlock device, error: {ex.Message}");
+                        }
+
+                        if (needPressHome)
                         {
                             var scriptArgs = new Dictionary<string, object>
                             {

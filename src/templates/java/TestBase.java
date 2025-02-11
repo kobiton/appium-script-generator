@@ -720,10 +720,20 @@ public class TestBase {
         switch (type) {
             case HOME:
                 if (isIos) {
-                    IOSDriver<MobileElement> iosDriver = getIosDriver();
-                    if (iosDriver.isDeviceLocked()) {
-                        iosDriver.unlockDevice();
-                    } else {
+                    boolean needPressHome = true;
+                    try {
+                        IOSDriver<MobileElement> iosDriver = getIosDriver();
+                        // isDeviceLocked() and unlockDevice() could failed on some devices
+                        if (iosDriver.isDeviceLocked()) {
+                            iosDriver.unlockDevice();
+                            needPressHome = false;
+                        }
+                    }
+                    catch (Exception ex) {
+                        System.out.println(String.format("Cannot check device locked or unlock device, error: %s", ex.getMessage()));
+                    }
+
+                    if (needPressHome) {
                         driver.executeScript("mobile: pressButton", ImmutableMap.of("name", "home"));
                     }
                 } else {
