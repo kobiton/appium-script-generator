@@ -516,12 +516,11 @@ namespace AppiumTest
                     else
                     {
                         foundElement = FindElementBy(locators);
-                    }
-
-                    var rect = foundElement.Rect;
-                    if (!foundElement.Displayed || rect.X < 0 || rect.Y < 0 || rect.Width == 0 || rect.Height == 0)
-                    {
-                        throw new Exception("Element is found but is not visible");
+                        var rect = foundElement.Rect;
+                        if (!foundElement.Displayed || rect.X < 0 || rect.Y < 0 || rect.Width == 0 || rect.Height == 0)
+                        {
+                            throw new Exception("Element is found but is not visible");
+                        }
                     }
 
                     return foundElement;

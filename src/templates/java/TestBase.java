@@ -433,11 +433,10 @@ public class TestBase {
                 }
                 else {
                     foundElement = findElementBy(locators);
-                }
-
-                Rectangle rect = foundElement.getRect();
-                if (!foundElement.isDisplayed() || rect.x < 0 || rect.y < 0|| rect.width == 0 || rect.height == 0) {
-                    throw new Exception("Element is found but is not visible");
+                    Rectangle rect = foundElement.getRect();
+                    if (!foundElement.isDisplayed() || rect.x < 0 || rect.y < 0|| rect.width == 0 || rect.height == 0) {
+                        throw new Exception("Element is found but is not visible");
+                    }
                 }
 
                 return foundElement;
