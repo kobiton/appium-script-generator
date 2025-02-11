@@ -407,12 +407,11 @@ export default class TestBase {
       }
       else {
         foundElement = await this.findElementBy(Config.IMPLICIT_WAIT_IN_MS, locators)
-      }
-
-      const rect = await this.getRect(foundElement)
-      const isVisible = (await this._driver.elementIdDisplayed(foundElement.ELEMENT)).value
-      if (!isVisible || rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
-        throw new Error("Element is found but is not visible")
+        const rect = await this.getRect(foundElement)
+        const isVisible = (await this._driver.elementIdDisplayed(foundElement.ELEMENT)).value
+        if (!isVisible || rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
+          throw new Error("Element is found but is not visible")
+        }
       }
 
       return foundElement
