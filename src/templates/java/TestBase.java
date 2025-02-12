@@ -770,7 +770,12 @@ public class TestBase {
                 break;
 
             case DELETE:
-                sendKeys("\b");
+                if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON) {
+                    sendKeys("\b");
+                }
+                else {
+                    sendKeys(this.isIos ? "\b" : Keys.BACK_SPACE.toString());
+                }
                 break;
 
             default:
@@ -783,7 +788,12 @@ public class TestBase {
         System.out.println(String.format("Press on %s key %s times", type, count));
         switch (type) {
             case DELETE:
-                sendKeys(new String(new char[count]).replace("\0", "\b"));
+                if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON) {
+                    sendKeys(new String(new char[count]).replace("\0", "\b"));
+                }
+                else {
+                    sendKeys(new String(new char[count]).replace("\0", this.isIos ? "\b" : Keys.BACK_SPACE.toString()));
+                }
                 break;
             default:
                 for (int i = 0; i < count; i++) {

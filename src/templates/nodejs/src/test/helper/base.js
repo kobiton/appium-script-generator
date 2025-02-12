@@ -605,16 +605,7 @@ export default class TestBase {
     actions[0].actions.push({type: 'pointerUp', button: 0})
 
     console.log(`Drag from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
-    await this.appiumActions(actions)
-  }
-
-  async appiumActions(actions) {
-    const response = await axios.post(
-      `${this._proxy.getServerUrl()}/wd/hub/session/${this._driver.requestHandler.sessionID}/actions`,
-      {actions}
-    )
-
-    return response.data.value
+    await this._driver.actions(actions)
   }
 
   async dragFromPoint(fromPoint, relativeOffsetX, relativeOffsetY) {
@@ -697,7 +688,12 @@ export default class TestBase {
         break
 
       case PRESS_TYPES.DELETE:
-        await this.sendKeys('\b')
+        if (Config.DEVICE_SOURCE === DEVICE_SOURCES.KOBITON) {
+          await this.sendKeys('\b')
+        }
+        else {
+          await this.sendKeys(this._isIos ? '\b' : '\ue003')
+        }
         break
 
       default:
@@ -709,7 +705,12 @@ export default class TestBase {
     console.log(`Press on ${type} key ${count} times`)
     switch (type) {
       case PRESS_TYPES.DELETE:
-        await this.sendKeys('\b'.repeat(count))
+        if (Config.DEVICE_SOURCE === DEVICE_SOURCES.KOBITON) {
+          await this.sendKeys('\b'.repeat(count))
+        }
+        else {
+          await this.sendKeys((this._isIos ? '\b' : '\ue003').repeat(count))
+        }
         break
 
       default:
