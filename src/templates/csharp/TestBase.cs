@@ -918,7 +918,14 @@ namespace AppiumTest
                     break;
 
                 case PressTypes.Delete:
-                    SendKeys("\b");
+                    if (Config.DeviceSource == Config.DeviceSourceEnums.Kobiton)
+                    {
+                        SendKeys("\b");
+                    }
+                    else
+                    {
+                        SendKeys(isIos ? "\b" : Keys.Backspace.ToString());
+                    }
                     break;
 
                 default:
@@ -933,7 +940,14 @@ namespace AppiumTest
             switch (type)
             {
                 case PressTypes.Delete:
-                    SendKeys(new string('\b', count));
+                    if (Config.DeviceSource == Config.DeviceSourceEnums.Kobiton)
+                    {
+                        SendKeys(new string('\b', count));
+                    }
+                    else
+                    {
+                        SendKeys(new string(isIos ? '\b' : Keys.Backspace[0], count));
+                    }
                     break;
                 default:
                     for (int i = 0; i < count; i++)
