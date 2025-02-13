@@ -25,6 +25,34 @@ switch (command) {
     }
 
     return JSON.stringify(result)
+
+  case "insertKobitonWebview":
+    const elementId = '__kobiton_webview'
+    let webView = document.getElementById(elementId)
+    if (webView) return true
+
+    webView = document.createElement('kobiton-webview')
+    webView.id = elementId
+    webView.style.left = '0px'
+    webView.style.top = '0px'
+    webView.style.width = '100%'
+    webView.style.height = '100%'
+    webView.style.position = 'fixed'
+    webView.setAttribute('aria-label', elementId)
+    webView.appendChild(document.createTextNode(elementId))
+
+    webView.style.pointerEvents = 'none';
+    webView.style.zIndex = '-2147483647';
+    webView.style.color = 'transparent';
+    webView.style.backgroundColor = 'transparent';
+    webView.style.border = 'none';
+    webView.style.outline = 'none';
+    webView.style.margin = '0 0 0 0';
+    webView.style.padding = '0 0 0 0';
+    webView.style.overflow = 'hidden';
+
+    document.body.appendChild(webView)
+    return true
   default:
     throw new Error(`Unsupported command: ${command}`)
 }
