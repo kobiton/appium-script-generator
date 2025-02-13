@@ -28,6 +28,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
+import org.jsoup.select.Elements;
 import org.openqa.selenium.*;
 import org.openqa.selenium.interactions.KeyInput;
 import org.openqa.selenium.interactions.PointerInput;
@@ -119,7 +120,15 @@ public class TestBase {
         switchToNativeContext();
         Document nativeDocument = loadXMLFromString(driver.getPageSource());
         List<String> nativeTexts = new ArrayList<>();
-        for (Element element : nativeDocument.selectXpath(getWebviewXpathSelector() + "//*")) {
+        Elements elements;
+        if (nativeDocument.selectXpath(getWebviewXpathSelector()).isEmpty()) {
+            elements = nativeDocument.selectXpath("//*");
+        }
+        else {
+            elements = nativeDocument.selectXpath(getWebviewXpathSelector() + "//*");
+        }
+
+        for (Element element : elements) {
             if (!element.children().isEmpty()) continue;
             String text = "";
             if (isIos) {
@@ -227,7 +236,6 @@ public class TestBase {
 
         scrollToWebElement(foundElement);
         Rectangle webRectVarName = getWebElementRect(foundElement);
-        switchToNativeContext();
         return calculateNativeRect(webRectVarName);
     }
 
@@ -235,7 +243,6 @@ public class TestBase {
         System.out.println(String.format("Finding web element rectangle on scrollable with locator: %s", Utils.getLocatorText(locators)));
         MobileElement foundElement = findElementOnScrollableInContext(true, locators);
         Rectangle webRectVarName = getWebElementRect(foundElement);
-        switchToNativeContext();
         return calculateNativeRect(webRectVarName);
     }
 
@@ -264,63 +271,27 @@ public class TestBase {
     }
 
     public Rectangle calculateNativeRect(Rectangle webElementRect) throws Exception {
-        Rectangle webviewRect = findWebview().getRect();
-
-        MobileElement topToolbar = null;
-        if (this.isIos) {
-            try {
-                topToolbar = findElementBy(null, 1000, By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
-            } catch (Exception ignored) {
-                Document nativeDocument = loadXMLFromString(driver.getPageSource());
-                Element webviewElement = nativeDocument.selectXpath(getWebviewXpathSelector()).first();
-                if (webviewElement == null) {
-                    throw new Exception("Cannot find webview element");
-                }
-
-                Element curElement = webviewElement.parent();
-                while (curElement != null) {
-                    Element firstChildElement = curElement.child(0);
-                    Rectangle firstChildRect = new Rectangle(
-                        Integer.parseInt(firstChildElement.attr("x")),
-                        Integer.parseInt(firstChildElement.attr("y")),
-                        Integer.parseInt(firstChildElement.attr("height")),
-                        Integer.parseInt(firstChildElement.attr("width"))
-                    );
-
-                    if (!webviewRect.equals(firstChildRect) && Utils.isRectangleInclude(webviewRect, firstChildRect)) {
-                        String topToolbarXpath = Utils.getXPath(firstChildElement).replace(IOS_XPATH_REDUNDANT_PREFIX, "");
-                        topToolbar = findElementBy(By.xpath(topToolbarXpath));
-                        break;
-                    }
-
-                    curElement = curElement.parent();
-                }
-            }
+        try {
+            executeScriptOnWebElement(null, "insertKobitonWebview");
+            switchToNativeContext();
+            MobileElement kobitonWebview = this.isIos
+                ? driver.findElement(By.xpath("//*[@label='__kobiton_webview']"))
+                : driver.findElement(By.xpath("//*[@text='__kobiton_webview']"));
+            Rectangle kobitonWebviewRect = kobitonWebview.getRect();
+            Rectangle nativeRect = new Rectangle(
+                    webElementRect.x + kobitonWebviewRect.x,
+                    webElementRect.y + kobitonWebviewRect.y,
+                    webElementRect.height,
+                    webElementRect.width
+            );
+            Dimension windowSize = driver.manage().window().getSize();
+            Rectangle windowRect = new Rectangle(new Point(0, 0), windowSize);
+            cropRect(nativeRect, windowRect);
+            return nativeRect;
         }
-
-        int webViewTop = webviewRect.y;
-        int deltaHeight = 0;
-        if (topToolbar != null) {
-            Rectangle topToolbarRect = topToolbar.getRect();
-            webViewTop = topToolbarRect.y + topToolbarRect.height;
-            deltaHeight = webViewTop - webviewRect.y;
+        catch (Exception e) {
+            throw new Exception("Cannot calculate native rectangle for web element, error: " + e.getMessage());
         }
-
-        webviewRect = new Rectangle(
-            webviewRect.x,
-            webViewTop,
-            webviewRect.height - deltaHeight,
-            webviewRect.width
-        );
-
-        Rectangle nativeRect = new Rectangle(
-            webviewRect.x + webElementRect.x,
-            webviewRect.y + webElementRect.y,
-            webElementRect.height,
-            webElementRect.width);
-
-        cropRect(nativeRect, webviewRect);
-        return nativeRect;
     }
 
     private List<MobileElement> findElements(MobileElement rootElement, int timeoutInMiliSeconds, boolean multiple, By... locators) throws Exception {
@@ -511,10 +482,6 @@ public class TestBase {
         }
 
         return foundVisibleElement;
-    }
-
-    public MobileElement findWebview() {
-        return driver.findElement(By.xpath(getWebviewXpathSelector()));
     }
 
     public String getWebviewXpathSelector() {

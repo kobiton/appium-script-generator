@@ -110,7 +110,15 @@ export default class TestBase {
     const source = await this._driver.getSource()
     const nativeDocument = this.loadXMLFromString(source)
     const nativeTexts = []
-    for (const element of nativeDocument.find(this.getWebviewXpathSelector() + '//*')) {
+    let elements
+    if (isEmpty(nativeDocument.find(this.getWebviewXpathSelector()))) {
+      elements = nativeDocument.find('//*')
+    }
+    else {
+      elements = nativeDocument.find(this.getWebviewXpathSelector() + '//*')
+    }
+
+    for (const element of elements) {
       if (element.childNodes().length !== 0) continue
       let textAttr
       if (this._isIos) {
@@ -229,7 +237,6 @@ export default class TestBase {
 
     await this.scrollToWebElement(webElement)
     const webElementRect = await this.getWebElementRect(webElement)
-    await this.switchToNativeContext()
     return await this.calculateNativeRect(webElementRect)
   }
 
@@ -237,7 +244,6 @@ export default class TestBase {
     console.log(`Finding web element rectangle on scrollable with locator: ${JSON.stringify(locators)}`)
     const foundElement = await this.findElementOnScrollableInContext(true, locators)
     const webRect = await this.getWebElementRect(foundElement)
-    await this.switchToNativeContext()
     return await this.calculateNativeRect(webRect)
   }
 
@@ -267,71 +273,33 @@ export default class TestBase {
   }
 
   async calculateNativeRect(webElementRect) {
-    let webviewRect = await this.getRect(await this.findWebview())
+    try {
+      await this.executeScriptOnWebElement(null, 'insertKobitonWebview')
+      await this.switchToNativeContext()
+      const kobitonWebview = this._isIos
+        ? await this._findElement(null, "//*[@label='__kobiton_webview']")
+        : await this._findElement(null, "//*[@text='__kobiton_webview']")
+      const kobitonWebviewRect = await this.getRect(kobitonWebview)
+      const nativeRect = new Rectangle({
+        x: webElementRect.x + kobitonWebviewRect.x,
+        y: webElementRect.y + kobitonWebviewRect.y,
+        width: webElementRect.width,
+        height: webElementRect.height,
+      })
 
-    let topToolbarRect
-    if (this._isIos) {
-      try {
-        const topToolbar = await this._findElement(null,
-          "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]")
-
-        topToolbarRect = await this.getRect(topToolbar)
-      }
-      catch (ignored) {
-        // Try more chance by finding the TopBrowserBar in the xml source.
-        const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
-        const webviewElement = nativeDocument.get(this.getWebviewXpathSelector())
-        if (!webviewElement) {
-          throw new Error('Cannot find webview element')
-        }
-
-        let curElement = webviewElement.parent()
-        while (curElement != null && curElement.type() === 'element') {
-          const firstChildElement = curElement.childNodes().find((child) => child.type() === 'element')
-          const firstChildRect = new Rectangle(
-            {
-              x: parseInt(firstChildElement.getAttribute("x").value()),
-              y: parseInt(firstChildElement.getAttribute("y").value()),
-              width: parseInt(firstChildElement.getAttribute("width").value()),
-              height: parseInt(firstChildElement.getAttribute("height").value()),
-            }
-          )
-
-          if (!webviewRect.equals(firstChildRect) && webviewRect.includes(firstChildRect)) {
-            topToolbarRect = firstChildRect
-            break
-          }
-
-          curElement = curElement.parent()
-        }
-      }
+      const windowRectRes = await this.getWindowRect()
+      const windowRect = new Rectangle({
+        x: 0,
+        y: 0,
+        width: windowRectRes.width,
+        height: windowRectRes.height,
+      })
+      this.cropRect(nativeRect, windowRect)
+      return nativeRect
     }
-
-    let webViewTop = webviewRect.y
-    let deltaHeight = 0
-
-    // Adjust the nativeWebElementRect if there is a top toolbar
-    if (topToolbarRect) {
-      webViewTop = topToolbarRect.y + topToolbarRect.height
-      deltaHeight = webViewTop - webviewRect.y
+    catch (err) {
+      throw new Error(`Cannot calculate native rectangle for web element, error: ${err.message}`)
     }
-
-    webviewRect = new Rectangle({
-      x: webviewRect.x,
-      y: webViewTop,
-      height: webviewRect.height - deltaHeight,
-      width: webviewRect.width
-    })
-
-    const nativeRect = new Rectangle({
-      x: webviewRect.x + webElementRect.x,
-      y: webviewRect.y + webElementRect.y,
-      height: webElementRect.height,
-      width: webElementRect.width
-    })
-
-    this.cropRect(nativeRect, webviewRect)
-    return nativeRect
   }
 
   async findElements(fromElement, timeout, multiple, locators) {
@@ -477,10 +445,6 @@ export default class TestBase {
     }
 
     return visibleElement
-  }
-
-  async findWebview() {
-    return await this._findElement(null, this.getWebviewXpathSelector())
   }
 
   getWebviewXpathSelector() {
@@ -746,6 +710,14 @@ export default class TestBase {
     const response = await axios.post(
       `${this._proxy.getServerUrl()}/wd/hub/session/${this._driver.requestHandler.sessionID}/appium/device/activate_app`,
       {bundleId: appId}
+    )
+
+    return response.data.value
+  }
+
+  async getWindowRect() {
+    const response = await axios.get(
+      `${this._proxy.getServerUrl()}/wd/hub/session/${this._driver.requestHandler.sessionID}/window/rect`,
     )
 
     return response.data.value
