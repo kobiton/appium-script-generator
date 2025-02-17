@@ -271,12 +271,14 @@ public class TestBase {
     }
 
     public Rectangle calculateNativeRect(Rectangle webElementRect) throws Exception {
+        double scale = Double.parseDouble(driver.executeScript("return window.visualViewport.scale").toString());
+        executeScriptOnWebElement(null, "insertKobitonWebview");
+        switchToNativeContext();
+
         try {
-            executeScriptOnWebElement(null, "insertKobitonWebview");
-            switchToNativeContext();
             MobileElement kobitonWebview = this.isIos
-                ? driver.findElement(By.xpath("//*[@label='__kobiton_webview']"))
-                : driver.findElement(By.xpath("//*[@text='__kobiton_webview']"));
+                ? findElementBy(By.xpath("//*[@label='__kobiton_webview']"))
+                : findElementBy(By.xpath("//*[@text='__kobiton_webview']"));
             Rectangle kobitonWebviewRect = kobitonWebview.getRect();
             Rectangle nativeRect = new Rectangle(
                     webElementRect.x + kobitonWebviewRect.x,
@@ -284,13 +286,98 @@ public class TestBase {
                     webElementRect.height,
                     webElementRect.width
             );
-            Dimension windowSize = driver.manage().window().getSize();
-            Rectangle windowRect = new Rectangle(new Point(0, 0), windowSize);
-            cropRect(nativeRect, windowRect);
+            cropRect(nativeRect, kobitonWebviewRect);
+            scaleRect(nativeRect, scale);
             return nativeRect;
         }
         catch (Exception e) {
-            throw new Exception("Cannot calculate native rectangle for web element, error: " + e.getMessage());
+            System.out.println(e.getMessage());
+
+            Rectangle webviewRect;
+            try {
+                webviewRect = findWebview().getRect();
+            }
+            catch (Exception ex1) {
+                if (this.isIos) throw ex1;
+
+                System.out.println(ex1.getMessage());
+                int webviewTop;
+                try {
+                    Rectangle toolbarRect = findElementBy(By.xpath("//*[@resource-id='com.android.chrome:id/toolbar']")).getRect();
+                    webviewTop = toolbarRect.y + toolbarRect.height;
+                }
+                catch (Exception ex2) {
+                    System.out.println(ex2.getMessage());
+                    Rectangle statusBarRect = findElementBy(By.xpath("//*[@resource-id='com.android.systemui:id/status_bar']")).getRect();
+                    webviewTop = statusBarRect.y + statusBarRect.height;
+                }
+
+                Dimension windowSize = driver.manage().window().getSize();
+                webviewRect = new Rectangle(
+                    0,
+                    webviewTop,
+                    windowSize.height - webviewTop,
+                    windowSize.width
+                );
+            }
+
+            MobileElement topToolbar = null;
+            if (this.isIos) {
+                try {
+                    topToolbar = findElementBy(null, 1000, By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
+                } catch (Exception ignored) {
+                    Document nativeDocument = loadXMLFromString(driver.getPageSource());
+                    Element webviewElement = nativeDocument.selectXpath(getWebviewXpathSelector()).first();
+                    if (webviewElement == null) {
+                        throw new Exception("Cannot find webview element");
+                    }
+
+                    Element curElement = webviewElement.parent();
+                    while (curElement != null) {
+                        Element firstChildElement = curElement.child(0);
+                        Rectangle firstChildRect = new Rectangle(
+                                Integer.parseInt(firstChildElement.attr("x")),
+                                Integer.parseInt(firstChildElement.attr("y")),
+                                Integer.parseInt(firstChildElement.attr("height")),
+                                Integer.parseInt(firstChildElement.attr("width"))
+                        );
+
+                        if (!webviewRect.equals(firstChildRect) && Utils.isRectangleInclude(webviewRect, firstChildRect)) {
+                            String topToolbarXpath = Utils.getXPath(firstChildElement).replace(IOS_XPATH_REDUNDANT_PREFIX, "");
+                            topToolbar = findElementBy(By.xpath(topToolbarXpath));
+                            break;
+                        }
+
+                        curElement = curElement.parent();
+                    }
+                }
+            }
+
+            int webViewTop = webviewRect.y;
+            int deltaHeight = 0;
+            if (topToolbar != null) {
+                Rectangle topToolbarRect = topToolbar.getRect();
+                webViewTop = topToolbarRect.y + topToolbarRect.height;
+                deltaHeight = webViewTop - webviewRect.y;
+            }
+
+            webviewRect = new Rectangle(
+                webviewRect.x,
+                webViewTop,
+                webviewRect.height - deltaHeight,
+                webviewRect.width
+            );
+
+            Rectangle nativeRect = new Rectangle(
+                webviewRect.x + webElementRect.x,
+                webviewRect.y + webElementRect.y,
+                webElementRect.height,
+                webElementRect.width
+            );
+
+            cropRect(nativeRect, webviewRect);
+            scaleRect(nativeRect, scale);
+            return nativeRect;
         }
     }
 
@@ -348,11 +435,7 @@ public class TestBase {
     }
 
     public MobileElement findElementBy(MobileElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
-        List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, false, locators);
-        if (foundElements == null || foundElements.size() != 1) {
-            throw new Exception(String.format("Cannot find element by: %s", Utils.getLocatorText(locators)));
-        }
-
+        List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
         return foundElements.get(0);
     }
 
@@ -366,10 +449,6 @@ public class TestBase {
 
     public List<MobileElement> findElementsBy(MobileElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
         List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
-        if (foundElements == null || foundElements.isEmpty()) {
-            throw new Exception(String.format("Cannot find elements by: %s", Utils.getLocatorText(locators)));
-        }
-
         return foundElements;
     }
 
@@ -482,6 +561,10 @@ public class TestBase {
         }
 
         return foundVisibleElement;
+    }
+
+    public MobileElement findWebview() throws Exception {
+        return findElementBy(By.xpath(getWebviewXpathSelector()));
     }
 
     public String getWebviewXpathSelector() {
@@ -816,7 +899,7 @@ public class TestBase {
         if (!isIos) return new Point(0, 0);
 
         try {
-            MobileElement rootElement = driver.findElement(By.xpath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
+            MobileElement rootElement = findElementBy(By.xpath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
             Dimension rootElementSize = rootElement.getSize();
             Point screenSize = getScreenSize();
             double screenWidthScaled = screenSize.x / retinaScale;
@@ -1009,6 +1092,13 @@ public class TestBase {
         if (rect.y + rect.height > boundRect.y + boundRect.height) {
             rect.height = boundRect.y + boundRect.height - rect.y;
         }
+    }
+
+    public void scaleRect(Rectangle rect, double scale) {
+        rect.x = (int) (rect.x * scale);
+        rect.y = (int) (rect.y * scale);
+        rect.width = (int) (rect.width * scale);
+        rect.height = (int) (rect.height * scale);
     }
 
     public void saveDebugResource() {

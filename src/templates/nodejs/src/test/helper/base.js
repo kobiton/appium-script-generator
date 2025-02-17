@@ -273,12 +273,14 @@ export default class TestBase {
   }
 
   async calculateNativeRect(webElementRect) {
+    const scale = (await this._driver.execute('return window.visualViewport.scale')).value
+    await this.executeScriptOnWebElement(null, 'insertKobitonWebview')
+    await this.switchToNativeContext()
+
     try {
-      await this.executeScriptOnWebElement(null, 'insertKobitonWebview')
-      await this.switchToNativeContext()
       const kobitonWebview = this._isIos
-        ? await this._findElement(null, "//*[@label='__kobiton_webview']")
-        : await this._findElement(null, "//*[@text='__kobiton_webview']")
+        ? await this.findElementBy(0, ["//*[@label='__kobiton_webview']"])
+        : await this.findElementBy(0, ["//*[@text='__kobiton_webview']"])
       const kobitonWebviewRect = await this.getRect(kobitonWebview)
       const nativeRect = new Rectangle({
         x: webElementRect.x + kobitonWebviewRect.x,
@@ -287,18 +289,107 @@ export default class TestBase {
         height: webElementRect.height,
       })
 
-      const windowRectRes = await this.getWindowRect()
-      const windowRect = new Rectangle({
-        x: 0,
-        y: 0,
-        width: windowRectRes.width,
-        height: windowRectRes.height,
-      })
-      this.cropRect(nativeRect, windowRect)
+      this.cropRect(nativeRect, kobitonWebviewRect)
+      this.scaleRect(nativeRect, scale)
       return nativeRect
     }
     catch (err) {
-      throw new Error(`Cannot calculate native rectangle for web element, error: ${err.message}`)
+      console.log(err.message)
+
+      let webviewRect
+      try {
+        webviewRect = await this.getRect(await this.findWebview())
+      }
+      catch (err1) {
+        if (this._isIos) throw err1
+
+        console.log(err1.message)
+        let webviewTop
+        try {
+          const toolbarRect = await this.getRect(
+            await this.findElementBy(0, ["//*[@resource-id='com.android.chrome:id/toolbar']"]))
+          webviewTop = toolbarRect.y + toolbarRect.height
+        }
+        catch (err2) {
+          console.log(err2.message)
+          const statusBarRect = await this.getRect(
+            await this.findElementBy(0, ["//*[@resource-id='com.android.systemui:id/status_bar']"]))
+          webviewTop = statusBarRect.y + statusBarRect.height
+        }
+
+        const windowRect = await this.getWindowRect()
+        webviewRect = new Rectangle({
+          x: 0,
+          y: webviewTop,
+          width: windowRect.width,
+          height: windowRect.height - webviewTop
+        })
+      }
+
+      let topToolbarRect
+      if (this._isIos) {
+        try {
+          const topToolbar = await this.findElementBy(0,
+            ["//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"])
+
+          topToolbarRect = await this.getRect(topToolbar)
+        }
+        catch (ignored) {
+          // Try more chance by finding the TopBrowserBar in the xml source.
+          const nativeDocument = this.loadXMLFromString(await this._driver.getSource())
+          const webviewElement = nativeDocument.get(this.getWebviewXpathSelector())
+          if (!webviewElement) {
+            throw new Error('Cannot find webview element')
+          }
+
+          let curElement = webviewElement.parent()
+          while (curElement != null && curElement.type() === 'element') {
+            const firstChildElement = curElement.childNodes().find((child) => child.type() === 'element')
+            const firstChildRect = new Rectangle(
+              {
+                x: parseInt(firstChildElement.getAttribute("x").value()),
+                y: parseInt(firstChildElement.getAttribute("y").value()),
+                width: parseInt(firstChildElement.getAttribute("width").value()),
+                height: parseInt(firstChildElement.getAttribute("height").value()),
+              }
+            )
+
+            if (!webviewRect.equals(firstChildRect) && webviewRect.includes(firstChildRect)) {
+              topToolbarRect = firstChildRect
+              break
+            }
+
+            curElement = curElement.parent()
+          }
+        }
+      }
+
+      let webViewTop = webviewRect.y
+      let deltaHeight = 0
+
+      // Adjust the nativeWebElementRect if there is a top toolbar
+      if (topToolbarRect) {
+        webViewTop = topToolbarRect.y + topToolbarRect.height
+        deltaHeight = webViewTop - webviewRect.y
+      }
+
+      webviewRect = new Rectangle({
+        x: webviewRect.x,
+        y: webViewTop,
+        height: webviewRect.height - deltaHeight,
+        width: webviewRect.width
+      })
+
+      const nativeRect = new Rectangle({
+        x: webviewRect.x + webElementRect.x,
+        y: webviewRect.y + webElementRect.y,
+        height: webElementRect.height,
+        width: webElementRect.width
+      })
+
+      this.cropRect(nativeRect, webviewRect)
+      this.scaleRect(nativeRect, scale)
+      return nativeRect
     }
   }
 
@@ -346,11 +437,7 @@ export default class TestBase {
   }
 
   async findElementBy(timeout, locators) {
-    const foundElements = await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), false, locators)
-    if (!foundElements || foundElements.length !== 1) {
-      throw new Error(`Cannot find element by: ${JSON.stringify(locators)}`)
-    }
-
+    const foundElements = await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), true, locators)
     return foundElements[0]
   }
 
@@ -394,7 +481,7 @@ export default class TestBase {
       }
 
       if (scrollableElement === null) {
-        scrollableElement = await this._findElement(null, infoMap['scrollableElementXpath'])
+        scrollableElement = await this.findElementBy(0, [infoMap['scrollableElementXpath']])
       }
 
       if (!swipedToTop) {
@@ -445,6 +532,10 @@ export default class TestBase {
     }
 
     return visibleElement
+  }
+
+  async findWebview() {
+    return await this.findElementBy(0, [this.getWebviewXpathSelector()])
   }
 
   getWebviewXpathSelector() {
@@ -740,7 +831,7 @@ export default class TestBase {
     if (!this._isIos) return new Point(0, 0)
 
     try {
-      const rootElement = await this._findElement(null, '//XCUIElementTypeApplication | //XCUIElementTypeOther')
+      const rootElement = await this.findElementBy(0, ['//XCUIElementTypeApplication | //XCUIElementTypeOther'])
       const rootElementSize = await this.getSize(rootElement)
       const screenSize = await this.getScreenSize()
       const screenWidthScaled = screenSize.x / this._retinaScale
@@ -992,6 +1083,13 @@ export default class TestBase {
     }
   }
 
+  scaleRect(rect, scale) {
+    rect.x = rect.x * scale
+    rect.y = rect.y * scale
+    rect.width = rect.width * scale
+    rect.height = rect.height * scale
+  }
+
   async saveDebugResource(options = {}) {
     let {source, screenshot} = options
 
@@ -1049,7 +1147,7 @@ export default class TestBase {
 
     result = result.value
     if (isEmpty(result)) {
-      throw new Error(`Cannot find elements with with locator: ${locator}`)
+      throw new Error(`Cannot find elements by: ${locator}`)
     }
 
     return result
