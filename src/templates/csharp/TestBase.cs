@@ -303,13 +303,15 @@ namespace AppiumTest
 
         public Rectangle CalculateNativeRect(Rectangle webElementRect)
         {
+            var scale = Convert.ToDouble(driver.ExecuteScript("return window.visualViewport.scale"));
+            ExecuteScriptOnWebElement(null, "insertKobitonWebview");
+            SwitchToNativeContext();
+
             try
             {
-                ExecuteScriptOnWebElement(null, "insertKobitonWebview");
-                SwitchToNativeContext();
                 var kobitonWebview = isIos
-                    ? driver.FindElement(By.XPath("//*[@label='__kobiton_webview']"))
-                    : driver.FindElement(By.XPath("//*[@text='__kobiton_webview']"));
+                    ? FindElementBy(By.XPath("//*[@label='__kobiton_webview']"))
+                    : FindElementBy(By.XPath("//*[@text='__kobiton_webview']"));
                 var kobitonWebviewRect = kobitonWebview.Rect;
                 var nativeRect = new Rectangle(
                     webElementRect.X + kobitonWebviewRect.X,
@@ -317,14 +319,125 @@ namespace AppiumTest
                     webElementRect.Width,
                     webElementRect.Height
                 );
-                var windowSize = driver.Manage().Window.Size;
-                var windowRect = new Rectangle(new Point(0, 0), windowSize);
-                CropRect(nativeRect, windowRect);
+
+                CropRect(ref nativeRect, kobitonWebviewRect);
+                ScaleRect(ref nativeRect, scale);
                 return nativeRect;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Cannot calculate native rectangle for web element, error: {ex.Message}");
+                Log(ex.Message);
+
+                Rectangle webviewRect;
+                try
+                {
+                    webviewRect = FindWebview().Rect;
+                }
+                catch (Exception ex1)
+                {
+                    if (isIos) throw;
+
+                    Log(ex1.Message);
+                    int webviewTop;
+                    try
+                    {
+                        var toolbarRect = FindElementBy(By.XPath("//*[@resource-id='com.android.chrome:id/toolbar']"))
+                            .Rect;
+                        webviewTop = toolbarRect.Y + toolbarRect.Height;
+                    }
+                    catch (Exception ex2)
+                    {
+                        Log(ex2.Message);
+                        var statusBarRect = FindElementBy(By.XPath("//*[@resource-id='com.android.systemui:id/status_bar']"))
+                            .Rect;
+                        webviewTop = statusBarRect.Y + statusBarRect.Height;
+                    }
+
+                    var windowSize = driver.Manage().Window.Size;
+                    webviewRect = new Rectangle(
+                        0,
+                        webviewTop,
+                        windowSize.Width,
+                        windowSize.Height - webviewTop
+                    );
+                }
+
+
+                AppiumWebElement topToolbar = null;
+                if (isIos)
+                {
+                    try
+                    {
+                        topToolbar =
+                            FindElementBy(null, 1000, By.XPath(
+                                "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
+                    }
+                    catch (Exception ignored)
+                    {
+                        XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
+                        XmlNode webviewNode = nativeDocument.SelectSingleNode(GetWebviewXpathSelector());
+                        if (webviewNode == null)
+                        {
+                            throw new Exception("Cannot find webview element");
+                        }
+
+                        XmlNode curElement = webviewNode.ParentNode;
+
+                        while (curElement != null)
+                        {
+                            XmlNode firstChildElement = curElement.SelectSingleNode("./*");
+
+                            Rectangle firstChildRect = new Rectangle(
+                                int.Parse(firstChildElement.Attributes["x"].Value),
+                                int.Parse(firstChildElement.Attributes["y"].Value),
+                                int.Parse(firstChildElement.Attributes["width"].Value),
+                                int.Parse(firstChildElement.Attributes["height"].Value)
+                            );
+
+                            if (!webviewRect.Equals(firstChildRect) &&
+                                Utils.IsRectangleInclude(webviewRect, firstChildRect))
+                            {
+                                string topToolbarXpath = Utils.GetXPath(firstChildElement).Replace(IosXpathRedundantPrefix, "");
+                                topToolbar = FindElementBy(By.XPath(topToolbarXpath));
+                                break;
+                            }
+
+                            curElement = curElement.ParentNode;
+                        }
+                    }
+                }
+
+                int webViewTop = webviewRect.Y;
+                int deltaHeight = 0;
+                if (topToolbar != null)
+                {
+                    Rectangle topToolbarRect = new Rectangle(
+                        topToolbar.Location.X,
+                        topToolbar.Location.Y,
+                        topToolbar.Size.Width,
+                        topToolbar.Size.Height
+                    );
+                    webViewTop = topToolbarRect.Y + topToolbarRect.Height;
+                    deltaHeight = webViewTop - webviewRect.Y;
+                }
+
+                webviewRect = new Rectangle(
+                    webviewRect.X,
+                    webViewTop,
+                    webviewRect.Width,
+                    webviewRect.Height - deltaHeight
+                );
+
+                Rectangle nativeRect = new Rectangle(
+                    webviewRect.X + webElementRect.X,
+                    webviewRect.Y + webElementRect.Y,
+                    webElementRect.Width,
+                    webElementRect.Height
+                );
+
+                CropRect(ref nativeRect, webviewRect);
+                ScaleRect(ref nativeRect, scale);
+                return nativeRect;
             }
         }
 
@@ -398,12 +511,7 @@ namespace AppiumTest
         public AppiumWebElement FindElementBy(AppiumWebElement? rootElement, int timeoutInMiliSeconds,
             params By[] locators)
         {
-            List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, false, locators);
-            if (foundElements == null || foundElements.Count != 1)
-            {
-                throw new Exception($"Cannot find element by: {Utils.GetLocatorText(locators)}");
-            }
-
+            List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, true, locators);
             return foundElements.ElementAt(0);
         }
 
@@ -421,11 +529,6 @@ namespace AppiumTest
             params By[] locators)
         {
             List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, true, locators);
-            if (foundElements == null || foundElements.IsNullOrEmpty())
-            {
-                throw new Exception($"Cannot find elements by: {Utils.GetLocatorText(locators)}");
-            }
-
             return foundElements;
         }
 
@@ -551,6 +654,11 @@ namespace AppiumTest
                 throw new Exception($"Cannot find visible web element by: {locatorText}");
 
             return visibleElement;
+        }
+
+        public AppiumWebElement FindWebview()
+        {
+            return FindElementBy(By.XPath(GetWebviewXpathSelector()));
         }
 
         public String GetWebviewXpathSelector()
@@ -968,7 +1076,7 @@ namespace AppiumTest
             try
             {
                 AppiumWebElement rootElement =
-                    driver.FindElement(By.XPath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
+                    FindElementBy(By.XPath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
                 Size rootElementSize = rootElement.Size;
                 Point screenSize = GetScreenSize();
                 double screenWidthScaled = screenSize.X / retinaScale;
@@ -1150,7 +1258,7 @@ namespace AppiumTest
             return appUrl;
         }
 
-        public Rectangle CropRect(Rectangle rect, Rectangle boundRect)
+        public void CropRect(ref Rectangle rect, Rectangle boundRect)
         {
             if (rect.X < boundRect.X)
             {
@@ -1179,8 +1287,14 @@ namespace AppiumTest
             {
                 rect.Height = boundRect.Y + boundRect.Height - rect.Y;
             }
+        }
 
-            return rect;
+        public void ScaleRect(ref Rectangle rect, double scale)
+        {
+            rect.X = (int) (rect.X * scale);
+            rect.Y = (int) (rect.Y * scale);
+            rect.Width = (int) (rect.Width * scale);
+            rect.Height = (int) (rect.Height * scale);
         }
 
         public void Log(string? str)
