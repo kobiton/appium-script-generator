@@ -294,37 +294,38 @@ export default class TestBase {
       return nativeRect
     }
     catch (err) {
+      if (this._isIos) throw err
+
       console.log(err.message)
-
-      let webviewRect
-      try {
-        webviewRect = await this.getRect(await this.findWebview())
+      const nativeDoc = this.loadXMLFromString(await this._driver.getSource())
+      let webviewTop = 0
+      const toolbarElement = nativeDoc.find("//*[@resource-id='com.android.chrome:id/toolbar' or @resource-id='com.android.chrome:id/url_bar' or @resource-id='com.android.chrome:id/location_bar' or @resource-id='com.android.chrome:id/home_button' or @resource-id='com.android.chrome:id/tab_switcher_button' or @resource-id='com.android.chrome:id/menu_button']")[0]
+      if (toolbarElement) {
+        const toolbarRect = this.getRectOfXmlElement(toolbarElement)
+        webviewTop = toolbarRect.y + toolbarRect.height
       }
-      catch (err1) {
-        if (this._isIos) throw err1
-
-        console.log(err1.message)
-        let webviewTop
-        try {
-          const toolbarRect = await this.getRect(
-            await this.findElementBy(0, ["//*[@resource-id='com.android.chrome:id/toolbar']"]))
-          webviewTop = toolbarRect.y + toolbarRect.height
-        }
-        catch (err2) {
-          console.log(err2.message)
-          const statusBarRect = await this.getRect(
-            await this.findElementBy(0, ["//*[@resource-id='com.android.systemui:id/status_bar']"]))
-          webviewTop = statusBarRect.y + statusBarRect.height
+      else {
+        const chromeElements = nativeDoc.find("//*[@package='com.android.chrome']")
+        for (const element of chromeElements) {
+          const rect = this.getRectOfXmlElement(element)
+          if (rect.y > 0 && rect.height > 0) {
+            webviewTop = rect.y
+            break
+          }
         }
 
-        const windowRect = await this.getWindowRect()
-        webviewRect = new Rectangle({
-          x: 0,
-          y: webviewTop,
-          width: windowRect.width,
-          height: windowRect.height - webviewTop
-        })
+        if (webviewTop === 0) {
+          throw new Error('Cannot calculate native rect for web element')
+        }
       }
+
+      const windowRect = await this.getWindowRect()
+      let webviewRect = new Rectangle({
+        x: 0,
+        y: webviewTop,
+        width: windowRect.width,
+        height: windowRect.height - webviewTop
+      })
 
       let topToolbarRect
       if (this._isIos) {
@@ -964,6 +965,18 @@ export default class TestBase {
       x: rect.x + rect.width / 2,
       y: rect.y + rect.height / 2
     }
+  }
+
+  getRectOfXmlElement(element) {
+    const bounds = element.getAttribute("bounds").value()
+    const parts = bounds.match(/\d+/g).map(Number)
+
+    const x = parts[0]
+    const y = parts[1]
+    const width = parts[2] - x
+    const height = parts[3] - y
+
+    return new Rectangle({x, y, width, height})
   }
 
   getAppiumServerUrl() {

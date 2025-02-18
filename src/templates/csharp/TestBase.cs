@@ -326,42 +326,48 @@ namespace AppiumTest
             }
             catch (Exception ex)
             {
+                if (isIos) throw;
+
                 Log(ex.Message);
-
-                Rectangle webviewRect;
-                try
+                var nativeDoc = LoadXMLFromString(driver.PageSource);
+                var webviewTop = 0;
+                var toolbarElement = nativeDoc.SelectSingleNode(
+                    "//*[@resource-id='com.android.chrome:id/toolbar' or @resource-id='com.android.chrome:id/url_bar' or @resource-id='com.android.chrome:id/location_bar' or @resource-id='com.android.chrome:id/home_button' or @resource-id='com.android.chrome:id/tab_switcher_button' or @resource-id='com.android.chrome:id/menu_button']");
+                if (toolbarElement != null)
                 {
-                    webviewRect = FindWebview().Rect;
+                    var toolbarRect = getRectOfXmlElement(toolbarElement);
+                    webviewTop = toolbarRect.Y + toolbarRect.Height;
                 }
-                catch (Exception ex1)
+                else
                 {
-                    if (isIos) throw;
-
-                    Log(ex1.Message);
-                    int webviewTop;
-                    try
+                    var chromeElements = nativeDoc.SelectNodes("//*[@package='com.android.chrome']");
+                    if (!chromeElements.IsNullOrEmpty())
                     {
-                        var toolbarRect = FindElementBy(By.XPath("//*[@resource-id='com.android.chrome:id/toolbar']"))
-                            .Rect;
-                        webviewTop = toolbarRect.Y + toolbarRect.Height;
-                    }
-                    catch (Exception ex2)
-                    {
-                        Log(ex2.Message);
-                        var statusBarRect = FindElementBy(By.XPath("//*[@resource-id='com.android.systemui:id/status_bar']"))
-                            .Rect;
-                        webviewTop = statusBarRect.Y + statusBarRect.Height;
+                        foreach (XmlNode element in chromeElements)
+                        {
+                            var rect = getRectOfXmlElement(element);
+                            if (rect.Y > 0 && rect.Height > 0)
+                            {
+                                webviewTop = rect.Y;
+                                break;
+                            }
+                        }
+
+                        if (webviewTop == 0)
+                        {
+                            throw new Exception("Cannot calculate native rect for web element");
+                        }
                     }
 
-                    var windowSize = driver.Manage().Window.Size;
-                    webviewRect = new Rectangle(
-                        0,
-                        webviewTop,
-                        windowSize.Width,
-                        windowSize.Height - webviewTop
-                    );
                 }
 
+                var windowSize = driver.Manage().Window.Size;
+                var webviewRect = new Rectangle(
+                    0,
+                    webviewTop,
+                    windowSize.Width,
+                    windowSize.Height - webviewTop
+                );
 
                 AppiumWebElement topToolbar = null;
                 if (isIos)
@@ -1186,6 +1192,19 @@ namespace AppiumTest
         {
             Point center = new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
             return center;
+        }
+
+        public Rectangle getRectOfXmlElement(XmlNode element)
+        {
+            var bounds = element.Attributes?["bounds"]?.Value;
+            var parts = bounds.Split(',', '[', ']');
+
+            var x = int.Parse(parts[1].Trim());
+            int y = int.Parse(parts[2].Trim());
+            int width = int.Parse(parts[4].Trim()) - x;
+            int height = int.Parse(parts[5].Trim()) - y;
+
+            return new Rectangle(x, y, width, height);
         }
 
         public string? GetTagOfElement(AppiumWebElement element)

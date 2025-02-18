@@ -291,35 +291,38 @@ public class TestBase {
             return nativeRect;
         }
         catch (Exception e) {
+            if (this.isIos) throw e;
+
             System.out.println(e.getMessage());
-
-            Rectangle webviewRect;
-            try {
-                webviewRect = findWebview().getRect();
+            Document nativeDoc = loadXMLFromString(driver.getPageSource());
+            int webviewTop = 0;
+            Element toolbarElement = nativeDoc.selectXpath("//*[@resource-id='com.android.chrome:id/toolbar' or @resource-id='com.android.chrome:id/url_bar' or @resource-id='com.android.chrome:id/location_bar' or @resource-id='com.android.chrome:id/home_button' or @resource-id='com.android.chrome:id/tab_switcher_button' or @resource-id='com.android.chrome:id/menu_button']").first();
+            if (toolbarElement != null) {
+                Rectangle toolbarRect = getRectOfXmlElement(toolbarElement);
+                webviewTop = toolbarRect.y + toolbarRect.height;
             }
-            catch (Exception ex1) {
-                if (this.isIos) throw ex1;
-
-                System.out.println(ex1.getMessage());
-                int webviewTop;
-                try {
-                    Rectangle toolbarRect = findElementBy(By.xpath("//*[@resource-id='com.android.chrome:id/toolbar']")).getRect();
-                    webviewTop = toolbarRect.y + toolbarRect.height;
-                }
-                catch (Exception ex2) {
-                    System.out.println(ex2.getMessage());
-                    Rectangle statusBarRect = findElementBy(By.xpath("//*[@resource-id='com.android.systemui:id/status_bar']")).getRect();
-                    webviewTop = statusBarRect.y + statusBarRect.height;
+            else {
+                Elements chromeElements = nativeDoc.selectXpath("//*[@package='com.android.chrome']");
+                for (Element element : chromeElements) {
+                    Rectangle rect = getRectOfXmlElement(element);
+                    if (rect.y > 0 && rect.height > 0) {
+                        webviewTop = rect.y;
+                        break;
+                    }
                 }
 
-                Dimension windowSize = driver.manage().window().getSize();
-                webviewRect = new Rectangle(
-                    0,
-                    webviewTop,
-                    windowSize.height - webviewTop,
-                    windowSize.width
-                );
+                if (webviewTop == 0) {
+                    throw new Exception("Cannot calculate native rect for web element");
+                }
             }
+
+            Dimension windowSize = driver.manage().window().getSize();
+            Rectangle webviewRect = new Rectangle(
+                0,
+                webviewTop,
+                windowSize.height - webviewTop,
+                windowSize.width
+            );
 
             MobileElement topToolbar = null;
             if (this.isIos) {
@@ -960,6 +963,18 @@ public class TestBase {
     public Point getCenterOfRect(Rectangle rect) {
         Point center = new Point(rect.x + rect.width / 2, rect.y + rect.height / 2);
         return center;
+    }
+
+    public Rectangle getRectOfXmlElement(Element element) {
+        String bounds = element.attr("bounds");
+        String[] parts = bounds.split("[,\\[\\]]");
+
+        int x = Integer.parseInt(parts[1].trim());
+        int y = Integer.parseInt(parts[2].trim());
+        int width = Integer.parseInt(parts[4].trim()) - x;
+        int height = Integer.parseInt(parts[5].trim()) - y;
+
+        return new Rectangle(x, y, height, width);
     }
 
     public IOSDriver<MobileElement> getIosDriver() {
