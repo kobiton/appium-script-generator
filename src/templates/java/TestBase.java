@@ -41,6 +41,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class TestBase {
     public AppiumDriver<MobileElement> driver;
@@ -61,6 +62,7 @@ public class TestBase {
     public final OkHttpClient httpClient = new OkHttpClient();
 
     private String currentContext;
+    private String currentWindow;
 
     public void setup(DesiredCapabilities desiredCaps, double retinaScale) throws Exception {
         this.desiredCaps = desiredCaps;
@@ -95,10 +97,18 @@ public class TestBase {
     }
 
     public void switchContext(String context) {
-        if (currentContext == context) return;
+        if (context.equals(currentContext)) return;
         System.out.println(String.format("Switch to %s context", context));
         driver.context(context);
         currentContext = context;
+    }
+
+    public void switchWindow(String window) {
+        if (window.equals(currentWindow)) return;
+        System.out.println(String.format("Switch to %s window", window));
+        driver.switchTo().window(window);
+        currentWindow = window;
+        currentContext = null;
     }
 
     public void switchToNativeContext() {
@@ -112,7 +122,6 @@ public class TestBase {
     }
 
     public String switchToWebContextCore() throws Exception {
-        List<ContextInfo> contextInfos = new ArrayList<>();
         switchToNativeContext();
         Document nativeDocument = loadXMLFromString(driver.getPageSource());
         List<String> nativeTexts = new ArrayList<>();
@@ -147,6 +156,47 @@ public class TestBase {
             if (!text.isEmpty()) nativeTexts.add(text);
         }
 
+        List<ContextInfo> webContextsInfo = collectWebContextsInfo(nativeTexts);
+        if (webContextsInfo.isEmpty()) {
+            throw new Exception("Cannot find any usable web contexts");
+        }
+
+        if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.OTHER) {
+            switchContext(webContextsInfo.get(0).context);
+            Set<String> windows = driver.getWindowHandles();
+            if (windows.size() > 1) {
+                String currentWindow = driver.getWindowHandle();
+                for (String window : windows) {
+                    if (window.equals(currentWindow)) continue;
+                    switchWindow(window);
+                    List<ContextInfo> webContextsInfoFromWindow = collectWebContextsInfo(nativeTexts);
+                    webContextsInfo.addAll(webContextsInfoFromWindow);
+                }
+            }
+        }
+
+        webContextsInfo = webContextsInfo.stream().filter(contextInfo -> !contextInfo.isHidden).collect(Collectors.toList());
+        if (webContextsInfo.isEmpty()) {
+            throw new Exception("Cannot find any usable web contexts");
+        }
+
+        ContextInfo bestContextInfo;
+        webContextsInfo.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
+        if (webContextsInfo.get(0).matchTextsPercent > 40) {
+            bestContextInfo = webContextsInfo.get(0);
+        } else {
+            webContextsInfo.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
+            bestContextInfo = webContextsInfo.get(0);
+        }
+
+        switchWindow(bestContextInfo.window);
+        switchContext(bestContextInfo.context);
+        System.out.println(String.format("Switched to %s web context in %s window successfully with confident %s%%", bestContextInfo.context, bestContextInfo.window, bestContextInfo.matchTextsPercent));
+        return bestContextInfo.context;
+    }
+
+    private List<ContextInfo> collectWebContextsInfo(List<String> nativeTexts) {
+        List<ContextInfo> contextInfos = new ArrayList<>();
         Set<String> contexts = driver.getContextHandles();
         boolean hasWebContext = contexts.stream().anyMatch(context -> !NATIVE_CONTEXT.equals(context));
         if (!hasWebContext) {
@@ -155,10 +205,14 @@ public class TestBase {
 
         for (String context : contexts) {
             if (!context.startsWith("WEBVIEW") && !context.equals("CHROMIUM")) continue;
+            ContextInfo contextInfo = new ContextInfo(context);
             String source;
             try {
                 switchContext(context);
                 boolean isHiddenDocument = (boolean) driver.executeScript("return document.hidden");
+                contextInfo.isHidden = isHiddenDocument;
+                contextInfo.window = driver.getWindowHandle();
+                contextInfos.add(contextInfo);
                 if (isHiddenDocument) continue;
                 source = driver.getPageSource();
             } catch (Exception ex) {
@@ -167,12 +221,6 @@ public class TestBase {
             }
 
             if (source == null) continue;
-            ContextInfo contextInfo = contextInfos.stream().filter(e -> e.context.equals(context)).findFirst().orElse(null);
-            if (contextInfo == null) {
-                contextInfo = new ContextInfo(context);
-                contextInfos.add(contextInfo);
-            }
-
             contextInfo.sourceLength = source.length();
             if (nativeTexts.isEmpty()) continue;
 
@@ -190,22 +238,7 @@ public class TestBase {
             }
         }
 
-        if (!contextInfos.isEmpty()) {
-            ContextInfo bestContextInfo;
-            contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.matchTextsPercent - c1.matchTextsPercent));
-            if (contextInfos.get(0).matchTextsPercent > 40) {
-                bestContextInfo = contextInfos.get(0);
-            } else {
-                contextInfos.sort((ContextInfo c1, ContextInfo c2) -> (int) (c2.sourceLength - c1.sourceLength));
-                bestContextInfo = contextInfos.get(0);
-            }
-
-            switchContext(bestContextInfo.context);
-            System.out.println(String.format("Switched to %s web context successfully with confident %s%%", bestContextInfo.context, bestContextInfo.matchTextsPercent));
-            return bestContextInfo.context;
-        }
-
-        throw new Exception("Cannot find any web context");
+        return contextInfos;
     }
 
     public String switchToWebContext() throws Exception {
@@ -1177,7 +1210,8 @@ public class TestBase {
     }
 
     public static class ContextInfo {
-        public String context;
+        public String context, window;
+        public boolean isHidden;
         public long sourceLength, matchTexts, matchTextsPercent;
 
         public ContextInfo(String context) {
