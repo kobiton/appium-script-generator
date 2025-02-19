@@ -279,8 +279,8 @@ export default class TestBase {
 
     try {
       const kobitonWebview = this._isIos
-        ? await this.findElementBy(0, ["//*[@label='__kobiton_webview']"])
-        : await this.findElementBy(0, ["//*[@text='__kobiton_webview']"])
+        ? await this._findSingleElementBy("//*[@label='__kobiton_webview']")
+        : await this._findSingleElementBy("//*[@text='__kobiton_webview']")
       const kobitonWebviewRect = await this.getRect(kobitonWebview)
       const nativeRect = new Rectangle({
         x: webElementRect.x + kobitonWebviewRect.x,
@@ -330,9 +330,7 @@ export default class TestBase {
       let topToolbarRect
       if (this._isIos) {
         try {
-          const topToolbar = await this.findElementBy(0,
-            ["//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"])
-
+          const topToolbar = await this._findSingleElementBy("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]")
           topToolbarRect = await this.getRect(topToolbar)
         }
         catch (ignored) {
@@ -391,6 +389,17 @@ export default class TestBase {
       this.cropRect(nativeRect, webviewRect)
       this.scaleRect(nativeRect, scale)
       return nativeRect
+    }
+  }
+
+  async _findSingleElementBy(locator) {
+    console.log(`Find element by locators: ${locator}`)
+
+    try {
+      return await this._findElement(null, locator)
+    }
+    catch (ignored) {
+      throw new Error(`Cannot find element by: ${locator}`)
     }
   }
 
@@ -536,7 +545,7 @@ export default class TestBase {
   }
 
   async findWebview() {
-    return await this.findElementBy(0, [this.getWebviewXpathSelector()])
+    return await this._findSingleElementBy(this.getWebviewXpathSelector())
   }
 
   getWebviewXpathSelector() {
@@ -548,9 +557,8 @@ export default class TestBase {
    */
   async touchAtCenterOfElement(element) {
     console.log(`Touch at center of element`)
-
     const centerPoint = element.rect.getCenterPoint()
-    return this.touchAtPoint(centerPoint)
+    await this.touchAtPoint(centerPoint)
   }
 
   /**
@@ -581,7 +589,7 @@ export default class TestBase {
 
     const absolutePoint = await this.getAbsolutePointOfRect(
       relativePointX, relativePointY, await this.getRect(element))
-    return this.touchAtPoint(absolutePoint)
+    await this.touchAtPoint(absolutePoint)
   }
 
   /**
@@ -591,7 +599,7 @@ export default class TestBase {
     console.log(`Touch at relative point (${relativePointX}, ${relativePointY})`)
 
     const absolutePoint = await this.getAbsolutePoint(relativePointX, relativePointY)
-    return this.touchAtPoint(absolutePoint)
+    await this.touchAtPoint(absolutePoint)
   }
 
   /**
@@ -600,11 +608,32 @@ export default class TestBase {
   async touchAtPoint(point) {
     console.log(`Touch at point (${point.x}, ${point.y})`)
 
-    const touchPerformSteps = [
-      {action: 'tap', options: point}
+    const actions = [
+      {
+        type: 'pointer',
+        id: 'finger',
+        parameters: {pointerType: 'touch'},
+        actions: [
+          {
+            type: 'pointerMove',
+            duration: 0,
+            origin: 'viewport',
+            x: point.x,
+            y: point.y
+          },
+          {
+            type: 'pointerDown',
+            button: 0
+          },
+          {
+            type: 'pointerUp',
+            button: 0
+          }
+        ]
+      }
     ]
 
-    await this._driver.touchPerform(touchPerformSteps)
+    await this._driver.actions(actions)
   }
 
   /**
@@ -613,12 +642,39 @@ export default class TestBase {
   async swipeByPoint(fromPoint, toPoint, durationInMs) {
     console.log(`Swipe from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y}) with duration ${durationInMs}`)
 
-    await this._driver.touchPerform([
-      {action: 'press', options: fromPoint},
-      {action: 'moveTo', options: toPoint},
-      {action: 'wait', options: {ms: durationInMs}},
-      {action: 'release'}
-    ])
+    const actions = [
+      {
+        type: 'pointer',
+        id: 'finger',
+        parameters: {pointerType: 'touch'},
+        actions: [
+          {
+            type: 'pointerMove',
+            duration: 0,
+            origin: 'viewport',
+            x: fromPoint.x,
+            y: fromPoint.y
+          },
+          {
+            type: 'pointerDown',
+            button: 0
+          },
+          {
+            type: 'pointerMove',
+            duration: durationInMs,
+            origin: 'viewport',
+            x: toPoint.x,
+            y: toPoint.y
+          },
+          {
+            type: 'pointerUp',
+            button: 0
+          }
+        ]
+      }
+    ]
+
+    await this._driver.actions(actions)
   }
 
   async swipeToTop(fromPoint) {
@@ -638,7 +694,7 @@ export default class TestBase {
       {
         type: 'pointer',
         id: 'finger',
-        parameters: { pointerType: 'touch' },
+        parameters: {pointerType: 'touch'},
         actions: [
           {type: 'pointerMove', duration: 0, origin: 'viewport', x: fromPoint.x, y: fromPoint.y},
           {type: 'pointerDown', button: 0}
@@ -832,7 +888,7 @@ export default class TestBase {
     if (!this._isIos) return new Point(0, 0)
 
     try {
-      const rootElement = await this.findElementBy(0, ['//XCUIElementTypeApplication | //XCUIElementTypeOther'])
+      const rootElement = await this._findSingleElementBy('//XCUIElementTypeApplication | //XCUIElementTypeOther')
       const rootElementSize = await this.getSize(rootElement)
       const screenSize = await this.getScreenSize()
       const screenWidthScaled = screenSize.x / this._retinaScale

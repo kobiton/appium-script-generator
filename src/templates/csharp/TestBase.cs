@@ -2,7 +2,6 @@
 using OpenQA.Selenium.Appium.Android;
 using OpenQA.Selenium.Appium.Enums;
 using OpenQA.Selenium.Appium.iOS;
-using OpenQA.Selenium.Appium.MultiTouch;
 using OpenQA.Selenium.Appium;
 using OpenQA.Selenium;
 using System.Drawing;
@@ -310,8 +309,8 @@ namespace AppiumTest
             try
             {
                 var kobitonWebview = isIos
-                    ? FindElementBy(By.XPath("//*[@label='__kobiton_webview']"))
-                    : FindElementBy(By.XPath("//*[@text='__kobiton_webview']"));
+                    ? FindSingleElementBy(By.XPath("//*[@label='__kobiton_webview']"))
+                    : FindSingleElementBy(By.XPath("//*[@text='__kobiton_webview']"));
                 var kobitonWebviewRect = kobitonWebview.Rect;
                 var nativeRect = new Rectangle(
                     webElementRect.X + kobitonWebviewRect.X,
@@ -375,8 +374,7 @@ namespace AppiumTest
                     try
                     {
                         topToolbar =
-                            FindElementBy(null, 1000, By.XPath(
-                                "//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
+                            FindSingleElementBy(By.XPath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
                     }
                     catch (Exception ignored)
                     {
@@ -404,7 +402,7 @@ namespace AppiumTest
                                 Utils.IsRectangleInclude(webviewRect, firstChildRect))
                             {
                                 string topToolbarXpath = Utils.GetXPath(firstChildElement).Replace(IosXpathRedundantPrefix, "");
-                                topToolbar = FindElementBy(By.XPath(topToolbarXpath));
+                                topToolbar = FindSingleElementBy(By.XPath(topToolbarXpath));
                                 break;
                             }
 
@@ -444,6 +442,20 @@ namespace AppiumTest
                 CropRect(ref nativeRect, webviewRect);
                 ScaleRect(ref nativeRect, scale);
                 return nativeRect;
+            }
+        }
+
+        private AppiumWebElement FindSingleElementBy(By locator)
+        {
+            Log("Find element by: " + locator);
+
+            try
+            {
+                return driver.FindElement(locator);
+            }
+            catch (Exception ignored)
+            {
+                throw new Exception("Cannot find element by: " + locator);
             }
         }
 
@@ -664,7 +676,7 @@ namespace AppiumTest
 
         public AppiumWebElement FindWebview()
         {
-            return FindElementBy(By.XPath(GetWebviewXpathSelector()));
+            return FindSingleElementBy(By.XPath(GetWebviewXpathSelector()));
         }
 
         public String GetWebviewXpathSelector()
@@ -675,14 +687,11 @@ namespace AppiumTest
         /**
          * Touch at center of element (element need to be visible)
          */
-        public TouchAction TouchAtCenterOfElement(AppiumWebElement element)
+        public void TouchAtCenterOfElement(AppiumWebElement element)
         {
             Log($"Touch at center of element {GetTagOfElement(element)}");
-
-            TouchAction action = new TouchAction(driver);
-            action.Tap(element);
-            action.Perform();
-            return action;
+            var center = GetCenterOfRect(element.Rect);
+            TouchAtPoint(center);
         }
 
         /**
@@ -712,37 +721,38 @@ namespace AppiumTest
         /**
          * Touch at relative point of element (element need to be visible)
          */
-        public TouchAction TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX,
+        public void TouchAtRelativePointOfElement(AppiumWebElement element, double relativePointX,
             double relativePointY)
         {
             Log($"Touch on element {GetTagOfElement(element)} at relative point ({relativePointX} {relativePointY})");
 
-            return TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
+            TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
         }
 
         /**
          * Touch at a relative position
          */
-        public TouchAction TouchAtPoint(double relativePointX, double relativePointY)
+        public void TouchAtPoint(double relativePointX, double relativePointY)
         {
             Log($"Touch at relative point ({relativePointX}, {relativePointY})");
 
             Point absolutePoint = GetAbsolutePoint(relativePointX, relativePointY);
-            return TouchAtPoint(absolutePoint);
+            TouchAtPoint(absolutePoint);
         }
 
         /**
          * Touch at a Point
          */
-        public TouchAction TouchAtPoint(Point point)
+        public void TouchAtPoint(Point point)
         {
             Log($"Touch at point ({point.X}, {point.Y})");
 
-            TouchAction action = new TouchAction(driver);
-            action.Tap(point.X, point.Y);
-            action.Perform();
-
-            return action;
+            var finger = new PointerInputDevice(PointerKind.Touch, "finger");
+            var sequence = new ActionSequence(finger, 0);
+            sequence.AddAction(finger.CreatePointerMove(CoordinateOrigin.Viewport, point.X, point.Y, TimeSpan.Zero));
+            sequence.AddAction(finger.CreatePointerDown(MouseButton.Left));
+            sequence.AddAction(finger.CreatePointerUp(MouseButton.Left));
+            driver.PerformActions(new List<ActionSequence> { sequence });
         }
 
         /**
@@ -1082,7 +1092,7 @@ namespace AppiumTest
             try
             {
                 AppiumWebElement rootElement =
-                    FindElementBy(By.XPath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
+                    FindSingleElementBy(By.XPath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
                 Size rootElementSize = rootElement.Size;
                 Point screenSize = GetScreenSize();
                 double screenWidthScaled = screenSize.X / retinaScale;

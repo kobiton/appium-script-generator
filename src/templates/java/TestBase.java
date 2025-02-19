@@ -9,16 +9,12 @@ import com.google.gson.stream.JsonReader;
 import io.appium.java_client.AppiumDriver;
 import io.appium.java_client.MobileElement;
 import io.appium.java_client.Setting;
-import io.appium.java_client.TouchAction;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.android.nativekey.AndroidKey;
 import io.appium.java_client.android.nativekey.KeyEvent;
 import io.appium.java_client.ios.IOSDriver;
 import io.appium.java_client.remote.MobileCapabilityType;
 import io.appium.java_client.remote.MobilePlatform;
-import io.appium.java_client.touch.TapOptions;
-import io.appium.java_client.touch.offset.ElementOption;
-import io.appium.java_client.touch.offset.PointOption;
 import okhttp3.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -277,8 +273,8 @@ public class TestBase {
 
         try {
             MobileElement kobitonWebview = this.isIos
-                ? findElementBy(By.xpath("//*[@label='__kobiton_webview']"))
-                : findElementBy(By.xpath("//*[@text='__kobiton_webview']"));
+                ? findSingleElementBy(By.xpath("//*[@label='__kobiton_webview']"))
+                : findSingleElementBy(By.xpath("//*[@text='__kobiton_webview']"));
             Rectangle kobitonWebviewRect = kobitonWebview.getRect();
             Rectangle nativeRect = new Rectangle(
                     webElementRect.x + kobitonWebviewRect.x,
@@ -327,7 +323,7 @@ public class TestBase {
             MobileElement topToolbar = null;
             if (this.isIos) {
                 try {
-                    topToolbar = findElementBy(null, 1000, By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
+                    topToolbar = findSingleElementBy(By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
                 } catch (Exception ignored) {
                     Document nativeDocument = loadXMLFromString(driver.getPageSource());
                     Element webviewElement = nativeDocument.selectXpath(getWebviewXpathSelector()).first();
@@ -347,7 +343,7 @@ public class TestBase {
 
                         if (!webviewRect.equals(firstChildRect) && Utils.isRectangleInclude(webviewRect, firstChildRect)) {
                             String topToolbarXpath = Utils.getXPath(firstChildElement).replace(IOS_XPATH_REDUNDANT_PREFIX, "");
-                            topToolbar = findElementBy(By.xpath(topToolbarXpath));
+                            topToolbar = findSingleElementBy(By.xpath(topToolbarXpath));
                             break;
                         }
 
@@ -381,6 +377,17 @@ public class TestBase {
             cropRect(nativeRect, webviewRect);
             scaleRect(nativeRect, scale);
             return nativeRect;
+        }
+    }
+
+    private MobileElement findSingleElementBy(By locator) throws Exception {
+        System.out.println("Find element by: " + locator);
+
+        try {
+            return this.driver.findElement(locator);
+        }
+        catch (Exception ignored) {
+            throw new Exception("Cannot find element by: " + locator);
         }
     }
 
@@ -567,7 +574,7 @@ public class TestBase {
     }
 
     public MobileElement findWebview() throws Exception {
-        return findElementBy(By.xpath(getWebviewXpathSelector()));
+        return findSingleElementBy(By.xpath(getWebviewXpathSelector()));
     }
 
     public String getWebviewXpathSelector() {
@@ -577,14 +584,10 @@ public class TestBase {
     /**
      * Touch at center of element (element need to be visible)
      */
-    public TouchAction touchAtCenterOfElement(MobileElement element) {
+    public void touchAtCenterOfElement(MobileElement element) {
         System.out.println(String.format("Touch at center of element %s", element.getTagName()));
-
-        TouchAction action = new TouchAction(driver)
-            .tap(TapOptions.tapOptions().withElement(ElementOption.element(element)));
-        action.perform();
-
-        return action;
+        Point center = getCenterOfElement(element);
+        touchAtPoint(center);
     }
 
     /**
@@ -609,33 +612,34 @@ public class TestBase {
     /**
      * Touch at relative point of element (element need to be visible)
      */
-    public TouchAction touchAtRelativePointOfElement(MobileElement element, double relativePointX, double relativePointY) {
+    public void touchAtRelativePointOfElement(MobileElement element, double relativePointX, double relativePointY) {
         System.out.println(String.format("Touch on element %s at relative point (%s %s)", element.getTagName(), relativePointX, relativePointY));
 
-        return touchAtPoint(getAbsolutePoint(relativePointX, relativePointY, element.getRect()));
+        touchAtPoint(getAbsolutePoint(relativePointX, relativePointY, element.getRect()));
     }
 
     /**
      * Touch at a relative position
      */
-    public TouchAction touchAtPoint(double relativePointX, double relativePointY) throws IOException {
+    public void touchAtPoint(double relativePointX, double relativePointY) throws IOException {
         System.out.println(String.format("Touch at relative point (%s, %s)", relativePointX, relativePointY));
 
         Point absolutePoint = getAbsolutePoint(relativePointX, relativePointY);
-        return touchAtPoint(absolutePoint);
+        touchAtPoint(absolutePoint);
     }
 
     /**
      * Touch at a Point
      */
-    public TouchAction touchAtPoint(Point point) {
+    public void touchAtPoint(Point point) {
         System.out.println(String.format("Touch at point (%s, %s)", point.x, point.y));
 
-        TouchAction action = new TouchAction(driver)
-            .tap(TapOptions.tapOptions().withPosition(PointOption.point(point)));
-        action.perform();
-
-        return action;
+        PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
+        Sequence touchSequence = new Sequence(finger, 0);
+        touchSequence.addAction(finger.createPointerMove(Duration.ofMillis(0), PointerInput.Origin.viewport(), point.x, point.y));
+        touchSequence.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
+        touchSequence.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
+        driver.perform(Arrays.asList(touchSequence));
     }
 
     /**
@@ -902,7 +906,7 @@ public class TestBase {
         if (!isIos) return new Point(0, 0);
 
         try {
-            MobileElement rootElement = findElementBy(By.xpath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
+            MobileElement rootElement = findSingleElementBy(By.xpath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
             Dimension rootElementSize = rootElement.getSize();
             Point screenSize = getScreenSize();
             double screenWidthScaled = screenSize.x / retinaScale;
