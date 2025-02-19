@@ -37,6 +37,7 @@ export default class TestBase {
     this._deviceName = null
     this._platformVersion = null
     this._currentContext = null
+    this._currentWindow = null
   }
 
   async setup(desiredCaps, retinaScale) {
@@ -83,6 +84,15 @@ export default class TestBase {
     this._currentContext = context
   }
 
+  async switchWindow(window) {
+    if (this._currentWindow === window) return
+
+    console.log(`Switch to ${window} window`)
+    await this._driver.window(window)
+    this._currentWindow = window
+    this._currentContext = null
+  }
+
   async switchToNativeContext() {
     const context = await this.getContext()
     if (NATIVE_CONTEXT === context) {
@@ -104,8 +114,6 @@ export default class TestBase {
   }
 
   async switchToWebContextCore() {
-    const contextInfos = []
-
     await this.switchToNativeContext()
     const source = await this._driver.getSource()
     const nativeDocument = this.loadXMLFromString(source)
@@ -142,7 +150,44 @@ export default class TestBase {
       if (text) nativeTexts.push(text)
     }
 
-    // Find the most webview is usable
+    let webContextsInfo = await this._collectWebContextsInfo(nativeTexts)
+    if (isEmpty(webContextsInfo)) throw new Error('Cannot find any usable web contexts')
+
+    if (Config.DEVICE_SOURCE === DEVICE_SOURCES.OTHER) {
+      await this.switchContext(webContextsInfo[0].context)
+      const windows = (await this._driver.windowHandles()).value
+      if (!isEmpty(windows) && windows.length > 1) {
+        const currentWindow = (await this._driver.windowHandle()).value
+        for (const window of windows) {
+          if (window === currentWindow) continue
+          await this.switchWindow(window)
+          const webContextsInfoFromWindow = await this._collectWebContextsInfo(nativeTexts)
+          webContextsInfo.push(...webContextsInfoFromWindow)
+        }
+      }
+    }
+
+    webContextsInfo = webContextsInfo.filter((info) => !info.isHidden)
+    if (isEmpty(webContextsInfo)) throw new Error('Cannot find any usable web contexts')
+
+    let bestContextInfo
+    webContextsInfo.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
+    if (webContextsInfo[0].matchTextsPercent > 40) {
+      bestContextInfo = webContextsInfo[0]
+    }
+    else {
+      webContextsInfo.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
+      bestContextInfo = webContextsInfo[0]
+    }
+
+    await this.switchWindow(bestContextInfo.window)
+    await this.switchContext(bestContextInfo.context)
+    console.log(`Switched to ${bestContextInfo.context} web context in ${bestContextInfo.window} window successfully with confident ${bestContextInfo.matchTextsPercent}%`)
+    return bestContextInfo.context
+  }
+
+  async _collectWebContextsInfo(nativeTexts) {
+    const contextInfos = []
     const contexts = await this.getContexts()
     const hasWebContext = contexts.some((context) => context !== NATIVE_CONTEXT)
     if (!hasWebContext) {
@@ -151,11 +196,23 @@ export default class TestBase {
 
     for (const context of contexts) {
       if (!context.startsWith('WEBVIEW') && context !== 'CHROMIUM') continue
+      const contextInfo = {
+        context,
+        isHidden: false,
+        window: null,
+        sourceLength: null,
+        matchTextsPercent: 0
+      }
+
       let source = null
       try {
         await this.switchContext(context)
         const res = await this._driver.execute('return document.hidden')
         const isHiddenDocument = get(res, 'value')
+        contextInfo.isHidden = isHiddenDocument
+        contextInfo.window = (await this._driver.windowHandle()).value
+        contextInfos.push(contextInfo)
+
         if (isHiddenDocument) continue
         source = await this._driver.getSource()
       }
@@ -165,18 +222,7 @@ export default class TestBase {
       }
 
       if (source === null) continue
-
-      let contextInfo = contextInfos.find(e => e.context === context)
-      if (!contextInfo) {
-        contextInfo = {
-          context,
-          sourceLength: source.length,
-          matchTextsPercent: 0
-        }
-
-        contextInfos.push(contextInfo)
-      }
-
+      contextInfo.sourceLength = source.length
       if (nativeTexts.length === 0) continue
 
       const htmlDoc = this.loadHtmlFromString(source)
@@ -199,24 +245,7 @@ export default class TestBase {
       }
     }
 
-    if (contextInfos.length !== 0) {
-      contextInfos.sort((c1, c2) => c2.matchTextsPercent - c1.matchTextsPercent)
-
-      let bestContextInfo
-      if (contextInfos[0].matchTextsPercent > 40) {
-        bestContextInfo = contextInfos[0]
-      }
-      else {
-        contextInfos.sort((c1, c2) => c2.sourceLength - c1.sourceLength)
-        bestContextInfo = contextInfos[0]
-      }
-
-      await this.switchContext(bestContextInfo.context)
-      console.log(`Switched to ${bestContextInfo.context} web context successfully with confident ${bestContextInfo.matchTextsPercent}%`)
-      return bestContextInfo.context
-    }
-
-    throw new Error('Cannot find any usable web contexts')
+    return contextInfos
   }
 
   async switchToWebContext() {
@@ -225,7 +254,7 @@ export default class TestBase {
     return await Utils.retry(async (attempt) => {
       console.log(`Finding a web context attempt ${attempt}`)
       await this.switchToWebContextCore()
-    }, null, 4, 10000)
+    }, (err) => console.log(err.message), 4, 10000)
   }
 
   async findWebElementRect(locators) {

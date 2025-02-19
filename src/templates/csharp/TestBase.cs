@@ -35,7 +35,8 @@ namespace AppiumTest
         public double retinaScale;
         public string deviceName, platformVersion;
         public HttpClient httpClient = new HttpClient();
-        private string currentContext;
+        private string? currentContext;
+        private string currentWindow;
 
         public static string IosXpathRedundantPrefix = "/AppiumAUT";
         public static string NativeContext = "NATIVE_APP";
@@ -86,6 +87,15 @@ namespace AppiumTest
             currentContext = context;
         }
 
+        public void SwitchWindow(string window)
+        {
+            if (currentWindow == window) return;
+            Log($"Switch to {window} window");
+            driver.SwitchTo().Window(window);
+            currentWindow = window;
+            currentContext = null;
+        }
+
         public void SwitchToNativeContext()
         {
             string currentContext = driver.Context;
@@ -100,8 +110,6 @@ namespace AppiumTest
 
         public string SwitchToWebContextCore()
         {
-            List<ContextInfo> contextInfos = new List<ContextInfo>();
-
             SwitchToNativeContext();
             XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
             List<string> nativeTexts = new List<string>();
@@ -150,6 +158,57 @@ namespace AppiumTest
                 }
             }
 
+            var webContextsInfo = CollectWebContextsInfo(nativeTexts);
+            if (webContextsInfo.IsNullOrEmpty())
+            {
+                throw new Exception("Cannot find any usable web contexts");
+            }
+
+            if (Config.DeviceSource == Config.DeviceSourceEnums.Other)
+            {
+                SwitchContext(webContextsInfo[0].context);
+                var windows = driver.WindowHandles;
+                if (windows.Count > 1)
+                {
+                    var currentWindowHandle = driver.CurrentWindowHandle;
+                    foreach (var window in windows)
+                    {
+                        if (window == currentWindowHandle) continue;
+                        SwitchWindow(window);
+                        var webContextsInfoFromWindow = CollectWebContextsInfo(nativeTexts);
+                        webContextsInfo.AddRange(webContextsInfoFromWindow);
+                    }
+                }
+            }
+
+            webContextsInfo = webContextsInfo.Where(contextInfo => !contextInfo.isHidden).ToList();
+            if (webContextsInfo.IsNullOrEmpty())
+            {
+                throw new Exception("Cannot find any usable web contexts");
+            }
+
+            ContextInfo bestContextInfo;
+            webContextsInfo.Sort((ContextInfo c1, ContextInfo c2) =>
+                (int)(c2.matchTextsPercent - c1.matchTextsPercent));
+            if (webContextsInfo[0].matchTextsPercent > 40)
+            {
+                bestContextInfo = webContextsInfo[0];
+            }
+            else
+            {
+                webContextsInfo.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
+                bestContextInfo = webContextsInfo[0];
+            }
+
+            SwitchWindow(bestContextInfo.window);
+            SwitchContext(bestContextInfo.context);
+            Log($"Switched to {bestContextInfo.context} web context in {bestContextInfo.window} window successfully with confident {bestContextInfo.matchTextsPercent}%");
+            return bestContextInfo.context;
+        }
+
+        private List<ContextInfo> CollectWebContextsInfo(List<string> nativeTexts)
+        {
+            List<ContextInfo> contextInfos = new List<ContextInfo>();
             var contexts = driver.Contexts;
             var hasWebContext = contexts.Any(context => !context.Equals(NativeContext));
             if (!hasWebContext)
@@ -160,11 +219,15 @@ namespace AppiumTest
             foreach (var context in contexts)
             {
                 if (!context.StartsWith("WEBVIEW") && !context.Equals("CHROMIUM")) continue;
+                var contextInfo = new ContextInfo(context);
                 string source;
                 try
                 {
                     SwitchContext(context);
                     var isHiddenDocument = (bool) driver.ExecuteScript("return document.hidden");
+                    contextInfo.isHidden = isHiddenDocument;
+                    contextInfo.window = driver.CurrentWindowHandle;
+                    contextInfos.Add(contextInfo);
                     if (isHiddenDocument) continue;
                     source = driver.PageSource;
                 }
@@ -175,13 +238,6 @@ namespace AppiumTest
                 }
 
                 if (source == null) continue;
-                ContextInfo contextInfo = contextInfos.FirstOrDefault(e => e.context.Equals(context));
-                if (contextInfo == null)
-                {
-                    contextInfo = new ContextInfo(context);
-                    contextInfos.Add(contextInfo);
-                }
-
                 contextInfo.sourceLength = source.Length;
                 if (nativeTexts.IsNullOrEmpty()) continue;
 
@@ -205,27 +261,7 @@ namespace AppiumTest
                 }
             }
 
-            if (!contextInfos.IsNullOrEmpty())
-            {
-                ContextInfo bestContextInfo;
-                contextInfos.Sort((ContextInfo c1, ContextInfo c2) =>
-                    (int)(c2.matchTextsPercent - c1.matchTextsPercent));
-                if (contextInfos[0].matchTextsPercent > 40)
-                {
-                    bestContextInfo = contextInfos[0];
-                }
-                else
-                {
-                    contextInfos.Sort((ContextInfo c1, ContextInfo c2) => (int)(c2.sourceLength - c1.sourceLength));
-                    bestContextInfo = contextInfos[0];
-                }
-
-                SwitchContext(bestContextInfo.context);
-                Log($"Switched to {bestContextInfo.context} web context successfully with confident {bestContextInfo.matchTextsPercent}%");
-                return bestContextInfo.context;
-            }
-
-            throw new Exception("Cannot find any web context");
+            return contextInfos;
         }
 
         public string SwitchToWebContext()
@@ -1474,7 +1510,8 @@ namespace AppiumTest
 
         public class ContextInfo
         {
-            public string context;
+            public string context, window;
+            public bool isHidden;
             public long sourceLength, matchTexts, matchTextsPercent;
 
             public ContextInfo(string context)
