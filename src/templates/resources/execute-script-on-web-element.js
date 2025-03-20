@@ -27,11 +27,11 @@ switch (command) {
     return JSON.stringify(result)
 
   case "insertKobitonWebview":
-    const elementId = '__kobiton_webview'
+    const elementId = '__kobiton_webview__'
     let webView = document.getElementById(elementId)
     if (webView) return true
 
-    webView = document.createElement('kobiton-webview')
+    webView = document.createElement('kobiton-webview-element')
     webView.id = elementId
     webView.style.left = '0px'
     webView.style.top = '0px'

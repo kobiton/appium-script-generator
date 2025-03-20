@@ -345,8 +345,8 @@ namespace AppiumTest
             try
             {
                 var kobitonWebview = isIos
-                    ? FindSingleElementBy(By.XPath("//*[@label='__kobiton_webview']"))
-                    : FindSingleElementBy(By.XPath("//*[@text='__kobiton_webview']"));
+                    ? FindSingleElementBy(By.XPath("//*[@label='__kobiton_webview__']"))
+                    : FindSingleElementBy(By.XPath("//*[@text='__kobiton_webview__']"));
                 var kobitonWebviewRect = kobitonWebview.Rect;
                 var nativeRect = new Rectangle(
                     webElementRect.X + kobitonWebviewRect.X,

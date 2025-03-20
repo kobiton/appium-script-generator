@@ -306,8 +306,8 @@ public class TestBase {
 
         try {
             MobileElement kobitonWebview = this.isIos
-                ? findSingleElementBy(By.xpath("//*[@label='__kobiton_webview']"))
-                : findSingleElementBy(By.xpath("//*[@text='__kobiton_webview']"));
+                ? findSingleElementBy(By.xpath("//*[@label='__kobiton_webview__']"))
+                : findSingleElementBy(By.xpath("//*[@text='__kobiton_webview__']"));
             Rectangle kobitonWebviewRect = kobitonWebview.getRect();
             Rectangle nativeRect = new Rectangle(
                     webElementRect.x + kobitonWebviewRect.x,
