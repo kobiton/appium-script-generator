@@ -308,8 +308,8 @@ export default class TestBase {
 
     try {
       const kobitonWebview = this._isIos
-        ? await this._findSingleElementBy("//*[@label='__kobiton_webview']")
-        : await this._findSingleElementBy("//*[@text='__kobiton_webview']")
+        ? await this._findSingleElementBy("//*[@label='__kobiton_webview__']")
+        : await this._findSingleElementBy("//*[@text='__kobiton_webview__']")
       const kobitonWebviewRect = await this.getRect(kobitonWebview)
       const nativeRect = new Rectangle({
         x: webElementRect.x + kobitonWebviewRect.x,
