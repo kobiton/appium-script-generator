@@ -760,8 +760,8 @@ export default class TestBase {
   }
 
   async sendKeys(keys) {
+    await this.sleep(Config.SEND_KEYS_DELAY_IN_MS)
     console.log(`Send keys: ${keys}`)
-    await this.sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS)
 
     const chars = [...keys]
     const actions = flatten(chars.map((char) => [
@@ -770,6 +770,7 @@ export default class TestBase {
     ]))
 
     await this._driver.actions([{type: 'key', id: 'keyboard', actions}])
+    await this.sleep(Config.SEND_KEYS_DELAY_IN_MS)
   }
 
   async clearTextField(maxChars) {

@@ -894,9 +894,8 @@ namespace AppiumTest
 
         public void SendKeys(string keys)
         {
+            sleep(Config.SendKeysDelayInMs);
             Log($"Send keys: {keys}");
-            sleep(Config.SleepTimeBeforeSendKeysInMs);
-
             try
             {
                 KeyInputDevice keyInput = new KeyInputDevice("keyboard");
@@ -921,6 +920,8 @@ namespace AppiumTest
                     GetAndroidDriver().Keyboard.SendKeys(keys);
                 }
             }
+
+            sleep(Config.SendKeysDelayInMs);
         }
 
         public void SendKeys(AppiumWebElement element, string keys)

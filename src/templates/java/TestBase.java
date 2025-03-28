@@ -769,9 +769,8 @@ public class TestBase {
     }
 
     public void sendKeys(String keys) throws Exception {
+        sleep(Config.SEND_KEYS_DELAY_IN_MS);
         System.out.println(String.format("Send keys: %s", keys));
-        sleep(Config.SLEEP_TIME_BEFORE_SEND_KEYS_IN_MS);
-
         try {
             KeyInput keyInput = new KeyInput("keyboard");
             Sequence sequence = new Sequence(keyInput, 0);
@@ -790,6 +789,8 @@ public class TestBase {
                 getAndroidDriver().getKeyboard().sendKeys(keys);
             }
         }
+
+        sleep(Config.SEND_KEYS_DELAY_IN_MS);
     }
 
     public void sendKeys(MobileElement element, String keys) {
