@@ -19,7 +19,7 @@ namespace AppiumTest
         public const int ImplicitWaitInMs = 10000;
         public const int DeviceWaitingMaxTryTimes = 5;
         public const int DeviceWaitingInternalInMs = 30000;
-        public const int SleepTimeBeforeSendKeysInMs = 3000;
+        public const int SendKeysDelayInMs = 1500;
         public const string KobitonApiUrl = "{{KobitonApiUrl}}";
         {{kobitonCredential}}
 
