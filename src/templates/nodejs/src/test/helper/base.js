@@ -33,6 +33,7 @@ export default class TestBase {
     this._proxy = null
     this._isIos = false
     this._screenSize = null
+    this._desiredCaps = null
     this._retinaScale = null
     this._deviceName = null
     this._platformVersion = null
@@ -41,6 +42,7 @@ export default class TestBase {
   }
 
   async setup(desiredCaps, retinaScale) {
+    this._desiredCaps = desiredCaps;
     this._retinaScale = retinaScale
 
     const platformName = get(desiredCaps, MOBILE_CAPABILITY_TYPES.PLATFORM_NAME, '')
@@ -76,12 +78,30 @@ export default class TestBase {
     }
   }
 
+  async updateCurrentContext() {
+    const previousContext = this._currentContext
+    this._currentContext = await this.getContext()
+    if (this._currentContext !== previousContext) {
+      console.log(`Context is changed from ${previousContext} to ${this._currentContext}`)
+    }
+
+    return previousContext
+  }
+
+  isNativeContext() {
+    return this._currentContext === NATIVE_CONTEXT
+  }
+
   async switchContext(context) {
     if (this._currentContext === context) return
 
     console.log(`Switch to ${context} context`)
     await this._driver.context(context)
     this._currentContext = context
+  }
+
+  async switchToNativeContext() {
+    await this.switchContext(NATIVE_CONTEXT)
   }
 
   async switchWindow(window) {
@@ -91,16 +111,6 @@ export default class TestBase {
     await this._driver.window(window)
     this._currentWindow = window
     this._currentContext = null
-  }
-
-  async switchToNativeContext() {
-    const context = await this.getContext()
-    if (NATIVE_CONTEXT === context) {
-      this._currentContext = NATIVE_CONTEXT
-      return
-    }
-
-    return this.switchContext(NATIVE_CONTEXT)
   }
 
   async getContext() {
@@ -257,25 +267,6 @@ export default class TestBase {
     }, (err) => console.log(err.message), 4, 10000)
   }
 
-  async findWebElementRect(locators) {
-    const webElement = await Utils.retry(async (attempt) => {
-      console.log(`Finding web element rectangle attempt ${attempt} with locator: ${JSON.stringify(locators)}`)
-      await this.switchToWebContext()
-      return await this.findVisibleWebElement(locators)
-    }, null, 3, 3000)
-
-    await this.scrollToWebElement(webElement)
-    const webElementRect = await this.getWebElementRect(webElement)
-    return await this.calculateNativeRect(webElementRect)
-  }
-
-  async findWebElementRectOnScrollable(locators) {
-    console.log(`Finding web element rectangle on scrollable with locator: ${JSON.stringify(locators)}`)
-    const foundElement = await this.findElementOnScrollableInContext(true, locators)
-    const webRect = await this.getWebElementRect(foundElement)
-    return await this.calculateNativeRect(webRect)
-  }
-
   async executeScriptOnWebElement(element, command) {
     const script = this.getResourceAsString('execute-script-on-web-element.js')
     const res = await this._driver.execute(script, element, command)
@@ -421,6 +412,51 @@ export default class TestBase {
     }
   }
 
+  async findVisibleElementCore(timeoutInMiliSeconds, locators) {
+    const foundElements = await this.findElementsBy(timeoutInMiliSeconds, locators)
+    let visibleElement = null
+
+    for (const element of foundElements) {
+      let visible
+      if (this.isNativeContext()) {
+        const rect = await this.getRect(element)
+        const isElementVisible = (await this._driver.elementIdDisplayed(element.ELEMENT)).value
+        visible = isElementVisible && rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0
+      }
+      else {
+        const isElementVisible = await this.executeScriptOnWebElement(element, 'isElementVisible')
+        visible = isElementVisible === 'true'
+      }
+
+      if (visible) {
+        visibleElement = element
+        break
+      }
+    }
+
+    if (!visibleElement) {
+      throw new Error(`Cannot find visible web element by: ${locators}`)
+    }
+
+    if (!this.isNativeContext()) {
+      await this.scrollToWebElement(visibleElement)
+    }
+
+    return visibleElement
+  }
+
+  async findVisibleElement(timeoutInMiliSeconds, locators) {
+    return await Utils.retry(async (attempt) => {
+      console.log(`Finding visible element attempt ${attempt} with locator: ${locators}`)
+      return await this.findVisibleElementCore(timeoutInMiliSeconds, locators)
+    }, async () => {
+      // Prevent switching to the wrong web context by trying a different one
+      if (!this.isNativeContext()) {
+        await this.switchToWebContext()
+      }
+    }, this.isNativeContext() ? 1 : 3, 3000)
+  }
+
   async _findSingleElementBy(locator) {
     console.log(`Find element by locators: ${locator}`)
 
@@ -477,42 +513,36 @@ export default class TestBase {
 
   async findElementBy(timeout, locators) {
     const foundElements = await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), true, locators)
+    // flex correct could switch context on the fly
+    if (this.isFlexCorrectEnabled()) {
+      await this.updateCurrentContext()
+    }
+
     return foundElements[0]
   }
 
   async findElementsBy(timeout, locators) {
-    return await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), true, locators)
+    const foundElements = await this.findElements(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeout), true, locators)
+    // flex correct could switch context on the fly
+    if (this.isFlexCorrectEnabled()) {
+      await this.updateCurrentContext()
+    }
+
+    return foundElements
   }
 
-  async findElementOnScrollableInContext(isWebContext, locators) {
+  async findVisibleElementOnScrollable(timeoutInMiliSeconds, locators) {
     const infoMap = JSON.parse(this.getResourceAsString(`${this.getCurrentCommandId()}.json`))
     const screenSize = await this.getScreenSize()
     let scrollableElement = null
     let swipedToTop = false
     const touchableElement = await Utils.retry(async (attempt) => {
-      if (isWebContext && attempt === 1) {
-        await this.switchToWebContext()
-      }
-
-      let foundElement
-      if (isWebContext) {
-        foundElement = await this.findVisibleWebElement(locators)
-        await this.scrollToWebElement(foundElement)
-      }
-      else {
-        foundElement = await this.findElementBy(Config.IMPLICIT_WAIT_IN_MS, locators)
-        const rect = await this.getRect(foundElement)
-        const isVisible = (await this._driver.elementIdDisplayed(foundElement.ELEMENT)).value
-        if (!isVisible || rect.x < 0 || rect.y < 0 || rect.width === 0 || rect.height === 0) {
-          throw new Error("Element is found but is not visible")
-        }
-      }
-
-      return foundElement
+      console.log(`Finding visible element on scrollable attempt ${attempt} with locator: ${locators}`)
+      return await this.findVisibleElementCore(timeoutInMiliSeconds, locators)
     }, async (err, attempt) => {
-      console.log(`Cannot find touchable element on scrollable ${attempt} attempt, error: ${err.message}`)
+      console.log(`Cannot find visible element on scrollable attempt ${attempt}, error: ${err.message}`)
       // Might switch to the wrong web context on the first attempt; retry before scrolling down
-      if (isWebContext && attempt === 1) {
+      if (!this.isNativeContext() && attempt === 1) {
         // Wait a bit for web is fully loaded
         await this.sleep(10000)
         await this.switchToWebContext()
@@ -543,34 +573,10 @@ export default class TestBase {
     }, 5, 3000)
 
     if (touchableElement === null) {
-      throw new Error('Cannot find any element on scrollable parent')
+      throw new Error('Cannot find any visible element on scrollable')
     }
 
     return touchableElement
-  }
-
-  async findElementOnScrollable(locators) {
-    return await this.findElementOnScrollableInContext(false, locators)
-  }
-
-  async findVisibleWebElement(locators) {
-    console.log(`Finding visible web element with locators ${JSON.stringify(locators)}`)
-    const foundElements = await this.findElementsBy(Config.IMPLICIT_WAIT_IN_MS, locators)
-
-    let visibleElement = null
-    for (const element of foundElements) {
-      const isElementVisible = await this.executeScriptOnWebElement(element, 'isElementVisible')
-      if (isElementVisible === 'true') {
-        visibleElement = element
-        break
-      }
-    }
-
-    if (!visibleElement) {
-      throw new Error('Cannot find visible web element')
-    }
-
-    return visibleElement
   }
 
   async findWebview() {
@@ -615,9 +621,16 @@ export default class TestBase {
    */
   async touchAtRelativePointOfElement(element, relativePointX, relativePointY) {
     console.log(`Touch on element at relative point (${relativePointX}, ${relativePointY})`)
+    let nativeRect
+    if (this.isNativeContext()) {
+      nativeRect = await this.getRect(element)
+    }
+    else {
+      const webRect = await this.getWebElementRect(element)
+      nativeRect = await this.calculateNativeRect(webRect)
+    }
 
-    const absolutePoint = await this.getAbsolutePointOfRect(
-      relativePointX, relativePointY, await this.getRect(element))
+    const absolutePoint = await this.getAbsolutePointOfRect(relativePointX, relativePointY, nativeRect)
     await this.touchAtPoint(absolutePoint)
   }
 
@@ -663,6 +676,22 @@ export default class TestBase {
     ]
 
     await this._driver.actions(actions)
+  }
+
+  async swipeOnElement(element, relativePointX1, relativePointY1, relativePointX2, relativePointY2, durationInMs) {
+    console.log(`Swipe on element from relative point (${relativePointX1} ${relativePointY1}) to relative point (${relativePointX2} ${relativePointY2})`)
+    let nativeRect
+    if (this.isNativeContext()) {
+      nativeRect = await this.getRect(element)
+    }
+    else {
+      const webRect = await this.getWebElementRect(element)
+      nativeRect = await this.calculateNativeRect(webRect)
+    }
+
+    const fromPoint = await this.getAbsolutePointOfRect(relativePointX1, relativePointY1, nativeRect)
+    const toPoint = await this.getAbsolutePointOfRect(relativePointX2, relativePointY2, nativeRect)
+    await this.swipeByPoint(fromPoint, toPoint, durationInMs)
   }
 
   /**
@@ -1051,6 +1080,11 @@ export default class TestBase {
       x: rect.x + rect.width / 2,
       y: rect.y + rect.height / 2
     }
+  }
+
+  isFlexCorrectEnabled() {
+    return Config.DEVICE_SOURCE === DEVICE_SOURCES.KOBITON &&
+      this._desiredCaps['kobiton:flexCorrect'] === true
   }
 
   getRectOfXmlElement(element) {
