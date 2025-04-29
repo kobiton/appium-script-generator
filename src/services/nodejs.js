@@ -248,6 +248,13 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
       lines.push(new Line(''))
       lines.push(new Line(`this.setCurrentCommandId(${step.id})`))
 
+      if (!context || context === CONTEXTS.NATIVE) {
+        lines.push(new Line('await this.switchToNativeContext()'))
+      }
+      else {
+        lines.push(new Line('await this.switchToWebContext()'))
+      }
+
       let locatorVarName, rawLocatorVarName
       if (hasSelector) {
         locatorVarName = this._getLocatorVarName(step, locatorVarNames)
@@ -264,21 +271,11 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'touchOnElement': {
           const {x, y} = action
-          if (context === CONTEXTS.NATIVE) {
-            const elementVarName = `element${rawLocatorVarName}`
-            // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
-            // eslint-disable-next-line max-len
-            lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
-          }
-          else {
-            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${locatorVarName})`))
-            lines.push(
-              // eslint-disable-next-line max-len
-              new Line(`await this.touchAtPoint(await this.getAbsolutePointOfRect(${x}, ${y}, ${nativeRectVarName}))`))
-          }
+          const elementVarName = `element${rawLocatorVarName}`
+          // eslint-disable-next-line max-len
+          lines.push(new Line(`const ${elementVarName} = await this.findVisibleElement(${findingElementTimeout}, ${locatorVarName})`))
+          // eslint-disable-next-line max-len
+          lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
         } break
 
         case 'touchOnScrollableParent': {
@@ -286,21 +283,11 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
 
           !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
-          if (context === CONTEXTS.NATIVE) {
-            const elementVarName = `element${rawLocatorVarName}`
-            // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${elementVarName} = await this.findElementOnScrollable(${locatorVarName})`))
-            // eslint-disable-next-line max-len
-            lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
-          }
-          else {
-            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            // eslint-disable-next-line max-len
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRectOnScrollable(${locatorVarName})`))
-            lines.push(
-              // eslint-disable-next-line max-len
-              new Line(`await this.touchAtPoint(await this.getAbsolutePointOfRect(${x}, ${y}, ${nativeRectVarName}))`))
-          }
+          const elementVarName = `element${rawLocatorVarName}`
+          // eslint-disable-next-line max-len
+          lines.push(new Line(`const ${elementVarName} = await this.findVisibleElementOnScrollable(${findingElementTimeout}, ${locatorVarName})`))
+          // eslint-disable-next-line max-len
+          lines.push(new Line(`await this.touchOnElement(${elementVarName}, ${x}, ${y})`))
         } break
 
         case 'touchAtPoint': {
@@ -312,37 +299,11 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
           const {x1, y1, x2, y2, duration} = action
 
           !isOnKeyboard && lines.push(new Line('await this.hideKeyboard()'))
-          if (context === CONTEXTS.NATIVE) {
-            /* eslint-disable */
-            const elementVarName = `element${rawLocatorVarName}`
-            lines.push(new Line(`const ${elementVarName} = await this.findElementBy(${findingElementTimeout}, ${locatorVarName})`))
-
-            const rectVarName = `rect${rawLocatorVarName}`
-            lines.push(new Line(`const ${rectVarName} = await this.getRect(${elementVarName})`))
-
-            const fromPointVarName = `fromPointOn${rawLocatorVarName}`
-            lines.push(new Line(`const ${fromPointVarName} = await this.getAbsolutePointOfRect(${x1}, ${y1}, ${rectVarName})`))
-
-            const toPointVarName = `toPointOn${rawLocatorVarName}`
-            lines.push(new Line(`const ${toPointVarName} = await this.getAbsolutePointOfRect(${x2}, ${y2}, ${rectVarName})`))
-
-            lines.push(new Line(`await this.swipeByPoint(${fromPointVarName}, ${toPointVarName}, ${duration})`))
-            /* eslint-enable */
-          }
-          else {
-            /* eslint-disable */
-            const nativeRectVarName = `nativeRect${rawLocatorVarName}`
-            lines.push(new Line(`const ${nativeRectVarName} = await this.findWebElementRect(${locatorVarName})`))
-
-            const fromPointVarName = `fromPointOn${rawLocatorVarName}`
-            lines.push(new Line(`const ${fromPointVarName} = await this.getAbsolutePointOfRect(${x1}, ${y1}, ${nativeRectVarName})`))
-
-            const toPointVarName = `toPointOn${rawLocatorVarName}`
-            lines.push(new Line(`const ${toPointVarName} = await this.getAbsolutePointOfRect(${x2}, ${y2}, ${nativeRectVarName})`))
-
-            lines.push(new Line(`await this.swipeByPoint(${fromPointVarName}, ${toPointVarName}, ${duration})`))
-            /* eslint-enable */
-          }
+          const elementVarName = `element${rawLocatorVarName}`
+          // eslint-disable-next-line max-len
+          lines.push(new Line(`const ${elementVarName} = await this.findVisibleElement(${findingElementTimeout}, ${locatorVarName})`))
+          // eslint-disable-next-line max-len
+          lines.push(new Line(`await this.swipeOnElement(${elementVarName}, ${x1}, ${y1}, ${x2}, ${y2}, ${duration})`))
         } break
 
         case 'swipeByPoints': {
@@ -354,38 +315,17 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
         case 'press': {
           const {value} = action
           const count = action.count || 1
-          if (context === CONTEXTS.NATIVE) {
-            if (count === 1) {
-              lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
-            }
-            else {
-              lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
-            }
+          if (count === 1) {
+            lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
           }
           else {
-            if (count === 1) {
-              lines.push(new Line('await this.switchToWebContext()'))
-              lines.push(new Line(`await this.press(PRESS_TYPES.${value})`))
-              lines.push(new Line('await this.switchToNativeContext()'))
-            }
-            else {
-              lines.push(new Line('await this.switchToWebContext()'))
-              lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
-              lines.push(new Line('await this.switchToNativeContext()'))
-            }
+            lines.push(new Line(`await this.pressMultiple(PRESS_TYPES.${value}, ${count})`))
           }
         } break
 
         case 'sendKeys': {
           const {value} = action
-          if (context === CONTEXTS.NATIVE) {
-            lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
-          }
-          else {
-            lines.push(new Line('await this.switchToWebContext()'))
-            lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
-            lines.push(new Line('await this.switchToNativeContext()'))
-          }
+          lines.push(new Line(`await this.sendKeys(${this._getString(value)})`))
         } break
 
         case 'sendKeysWithDDT': {
