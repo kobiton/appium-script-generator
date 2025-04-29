@@ -96,11 +96,29 @@ public class TestBase {
         }
     }
 
+    public String updateCurrentContext() {
+        String previousContext = currentContext;
+        currentContext = driver.getContext();
+        if (!Objects.equals(previousContext, currentContext)) {
+            System.out.println(String.format("Context is changed from %s to %s", previousContext, currentContext));
+        }
+
+        return previousContext;
+    }
+
+    public boolean isNativeContext() {
+        return NATIVE_CONTEXT.equals(currentContext);
+    }
+
     public void switchContext(String context) {
         if (context.equals(currentContext)) return;
         System.out.println(String.format("Switch to %s context", context));
         driver.context(context);
         currentContext = context;
+    }
+
+    public void switchToNativeContext() {
+        switchContext(NATIVE_CONTEXT);
     }
 
     public void switchWindow(String window) {
@@ -111,17 +129,7 @@ public class TestBase {
         currentContext = null;
     }
 
-    public void switchToNativeContext() {
-        String currentContext = driver.getContext();
-        if (NATIVE_CONTEXT.equals(currentContext)) {
-            this.currentContext = NATIVE_CONTEXT;
-            return;
-        }
-
-        switchContext(NATIVE_CONTEXT);
-    }
-
-    public String switchToWebContextCore() throws Exception {
+    private String switchToWebContextCore() throws Exception {
         switchToNativeContext();
         Document nativeDocument = loadXMLFromString(driver.getPageSource());
         List<String> nativeTexts = new ArrayList<>();
@@ -251,28 +259,6 @@ public class TestBase {
                 return switchToWebContextCore();
             }
         }, 4, 10000);
-    }
-
-    public Rectangle findWebElementRect(By... locators) throws Exception {
-        MobileElement foundElement = Utils.retry(new Utils.Task<MobileElement>() {
-            @Override
-            MobileElement exec(int attempt) throws Exception {
-                System.out.println(String.format("Finding web element rectangle attempt %s with locator: %s", Utils.convertToOrdinal(attempt), Utils.getLocatorText(locators)));
-                switchToWebContext();
-                return findVisibleWebElement(locators);
-            }
-        }, 3, 3000);
-
-        scrollToWebElement(foundElement);
-        Rectangle webRectVarName = getWebElementRect(foundElement);
-        return calculateNativeRect(webRectVarName);
-    }
-
-    public Rectangle findWebElementRectOnScrollable(By... locators) throws Exception {
-        System.out.println(String.format("Finding web element rectangle on scrollable with locator: %s", Utils.getLocatorText(locators)));
-        MobileElement foundElement = findElementOnScrollableInContext(true, locators);
-        Rectangle webRectVarName = getWebElementRect(foundElement);
-        return calculateNativeRect(webRectVarName);
     }
 
     public Object executeScriptOnWebElement(MobileElement element, String command) throws Exception {
@@ -413,6 +399,57 @@ public class TestBase {
         }
     }
 
+    private MobileElement findVisibleElementCore(int timeoutInMiliSeconds, By... locators) throws Exception {
+        List<MobileElement> foundElements = findElementsBy(null, timeoutInMiliSeconds, locators);
+        MobileElement foundVisibleElement = null;
+
+        for (MobileElement element : foundElements) {
+            boolean visible;
+
+            if (isNativeContext()) {
+                Rectangle rect = element.getRect();
+                visible = element.isDisplayed() && rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0;
+            }
+            else {
+                String res = (String) executeScriptOnWebElement(element, "isElementVisible");
+                visible = "true".equals(res);
+            }
+
+            if (visible) {
+                foundVisibleElement = element;
+                break;
+            }
+        }
+
+        if (foundVisibleElement == null) {
+            throw new Exception(String.format("Cannot find visible element by: %s", Utils.getLocatorText(locators)));
+        }
+
+        if (!isNativeContext()) {
+            scrollToWebElement(foundVisibleElement);
+        }
+
+        return foundVisibleElement;
+    }
+
+    public MobileElement findVisibleElement(int timeoutInMiliSeconds, By... locators) throws Exception{
+        return Utils.retry(new Utils.Task<MobileElement>() {
+            @Override
+            MobileElement exec(int attempt) throws Exception {
+                System.out.println(String.format("Finding visible element %s attempt with locator: %s", Utils.convertToOrdinal(attempt), Utils.getLocatorText(locators)));
+                return findVisibleElementCore(timeoutInMiliSeconds, locators);
+            }
+
+            @Override
+            public void handleException(Exception e, int attempt) throws Exception {
+                // Prevent switching to the wrong web context by trying a different one
+                if (!isNativeContext()) {
+                    switchToWebContext();
+                }
+            }
+        }, isNativeContext() ? 1 : 3, 3000);
+    }
+
     private MobileElement findSingleElementBy(By locator) throws Exception {
         System.out.println("Find element by: " + locator);
 
@@ -479,6 +516,11 @@ public class TestBase {
 
     public MobileElement findElementBy(MobileElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
         List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
+        // flex correct could switch context on the fly
+        if (isFlexCorrectEnabled()) {
+            updateCurrentContext();
+        }
+
         return foundElements.get(0);
     }
 
@@ -492,6 +534,11 @@ public class TestBase {
 
     public List<MobileElement> findElementsBy(MobileElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
         List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
+        // flex correct could switch context on the fly
+        if (isFlexCorrectEnabled()) {
+            updateCurrentContext();
+        }
+
         return foundElements;
     }
 
@@ -502,7 +549,7 @@ public class TestBase {
     /**
      * Scroll to find best element on scrollable
      */
-    public MobileElement findElementOnScrollableInContext(boolean isWebContext, By... locators) throws Exception {
+    public MobileElement findVisibleElementOnScrollable(int timeoutInMiliSeconds, By... locators) throws Exception {
         Type type = new TypeToken<Map<String, String>>() {
         }.getType();
         JsonReader reader = new JsonReader(new InputStreamReader(getResourceAsStream(getCurrentCommandId() + ".json")));
@@ -515,31 +562,15 @@ public class TestBase {
 
             @Override
             MobileElement exec(int attempt) throws Exception {
-                if (isWebContext && attempt == 1) {
-                    switchToWebContext();
-                }
-
-                MobileElement foundElement;
-                if (isWebContext) {
-                    foundElement = findVisibleWebElement(locators);
-                    scrollToWebElement(foundElement);
-                }
-                else {
-                    foundElement = findElementBy(locators);
-                    Rectangle rect = foundElement.getRect();
-                    if (!foundElement.isDisplayed() || rect.x < 0 || rect.y < 0|| rect.width == 0 || rect.height == 0) {
-                        throw new Exception("Element is found but is not visible");
-                    }
-                }
-
-                return foundElement;
+                System.out.println(String.format("Finding visible element on scrollable %s attempt with locator: %s", Utils.convertToOrdinal(attempt), Utils.getLocatorText(locators)));
+                return findVisibleElementCore(timeoutInMiliSeconds, locators);
             }
 
             @Override
             public void handleException(Exception e, int attempt) throws Exception {
-                System.out.println(String.format("Cannot find touchable element on scrollable %s attempt, error: %s", Utils.convertToOrdinal(attempt), e.getMessage()));
+                System.out.println(String.format("Cannot find visible element on scrollable %s attempt, error: %s", Utils.convertToOrdinal(attempt), e.getMessage()));
                 // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                if (isWebContext && attempt == 1) {
+                if (!isNativeContext() && attempt == 1) {
                     // Wait a bit for web is fully loaded
                     sleep(10000);
                     switchToWebContext();
@@ -569,41 +600,15 @@ public class TestBase {
         }, 5, 3000);
 
         if (touchableElement == null) {
-            throw new Exception("Cannot find any element on scrollable parent");
+            throw new Exception("Cannot find any visible element on scrollable");
         }
 
         return touchableElement;
     }
 
-    public MobileElement findElementOnScrollable(By... locators) throws Exception {
-        return findElementOnScrollableInContext(false, locators);
-    }
-
     public boolean isButtonElement(MobileElement element) throws Exception {
         String tagName = element.getTagName();
         return tagName != null && tagName.contains("Button");
-    }
-
-    public MobileElement findVisibleWebElement(By... locators) throws Exception {
-        String locatorText = Utils.getLocatorText(locators);
-        System.out.println(String.format("Find visible web element by: %s", locatorText));
-
-        List<MobileElement> foundElements = findElementsBy(locators);
-        MobileElement foundVisibleElement = null;
-        for (MobileElement element : foundElements) {
-            String res = (String) executeScriptOnWebElement(element, "isElementVisible");
-            boolean visible = "true".equals(res);
-            if (visible) {
-                foundVisibleElement = element;
-                break;
-            }
-        }
-
-        if (foundVisibleElement == null) {
-            throw new Exception(String.format("Cannot find visible web element by: %s", locators));
-        }
-
-        return foundVisibleElement;
     }
 
     public MobileElement findWebview() throws Exception {
@@ -645,10 +650,18 @@ public class TestBase {
     /**
      * Touch at relative point of element (element need to be visible)
      */
-    public void touchAtRelativePointOfElement(MobileElement element, double relativePointX, double relativePointY) {
+    public void touchAtRelativePointOfElement(MobileElement element, double relativePointX, double relativePointY) throws Exception {
         System.out.println(String.format("Touch on element %s at relative point (%s %s)", element.getTagName(), relativePointX, relativePointY));
+        Rectangle nativeRect;
+        if (isNativeContext()) {
+            nativeRect = element.getRect();
+        }
+        else {
+            Rectangle webRect = getWebElementRect(element);
+            nativeRect = calculateNativeRect(webRect);
+        }
 
-        touchAtPoint(getAbsolutePoint(relativePointX, relativePointY, element.getRect()));
+        touchAtPoint(getAbsolutePoint(relativePointX, relativePointY, nativeRect));
     }
 
     /**
@@ -673,6 +686,22 @@ public class TestBase {
         touchSequence.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
         touchSequence.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
         driver.perform(Arrays.asList(touchSequence));
+    }
+
+    public void swipeOnElement(MobileElement element, double relativePointX1, double relativePointY1, double relativePointX2, double relativePointY2, int durationInMs) throws Exception {
+        System.out.println(String.format("Swipe on element %s from relative point (%s %s) to relative point (%s %s)", element.getTagName(), relativePointX1, relativePointY1, relativePointX2, relativePointY2));
+        Rectangle nativeRect;
+        if (isNativeContext()) {
+            nativeRect = element.getRect();
+        }
+        else {
+            Rectangle webRect = getWebElementRect(element);
+            nativeRect = calculateNativeRect(webRect);
+        }
+
+        Point fromPoint = getAbsolutePoint(relativePointX1, relativePointY1, nativeRect);
+        Point toPoint = getAbsolutePoint(relativePointX2, relativePointY2, nativeRect);
+        swipeByPoint(fromPoint, toPoint, durationInMs);
     }
 
     /**
@@ -1001,6 +1030,11 @@ public class TestBase {
     public Point getCenterOfRect(Rectangle rect) {
         Point center = new Point(rect.x + rect.width / 2, rect.y + rect.height / 2);
         return center;
+    }
+
+    public boolean isFlexCorrectEnabled() {
+        return Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON &&
+            Boolean.TRUE.equals(this.desiredCaps.getCapability("kobiton:flexCorrect"));
     }
 
     public Rectangle getRectOfXmlElement(Element element) {

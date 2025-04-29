@@ -2,7 +2,7 @@ import BPromise from 'bluebird'
 
 class Utils {
   async retry(task, onError, maxAttempts, intervalInMs) {
-    maxAttempts = Math.max(maxAttempts, 1)
+    maxAttempts = Math.round(Math.max(maxAttempts, 1))
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
