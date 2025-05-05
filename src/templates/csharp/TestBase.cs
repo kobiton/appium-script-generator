@@ -79,6 +79,23 @@ namespace AppiumTest
             }
         }
 
+        public string UpdateCurrentContext()
+        {
+            var previousContext = currentContext;
+            currentContext = driver.Context;
+            if (currentContext != previousContext)
+            {
+                Log($"Context is changed from {previousContext} to {currentContext}");
+            }
+
+            return previousContext;
+        }
+
+        public bool IsNativeContext()
+        {
+            return currentContext == NativeContext;
+        }
+
         public void SwitchContext(string context)
         {
             if (currentContext == context) return;
@@ -98,17 +115,10 @@ namespace AppiumTest
 
         public void SwitchToNativeContext()
         {
-            string currentContext = driver.Context;
-            if (NativeContext.Equals(currentContext))
-            {
-                this.currentContext = NativeContext;
-                return;
-            }
-
             SwitchContext(NativeContext);
         }
 
-        public string SwitchToWebContextCore()
+        private string SwitchToWebContextCore()
         {
             SwitchToNativeContext();
             XmlDocument nativeDocument = LoadXMLFromString(driver.PageSource);
@@ -287,28 +297,6 @@ namespace AppiumTest
             return htmlDoc;
         }
 
-        public Rectangle FindWebElementRect(params By[] locators)
-        {
-            AppiumWebElement elementVarName = Utils.Retry((attempt) =>
-            {
-                Log($"Finding web element rectangle attempt {Utils.ConvertToOrdinal(attempt)} with locator: {Utils.GetLocatorText(locators)}");
-                SwitchToWebContext();
-                return FindVisibleWebElement(locators);
-            }, null, 3, 3000);
-
-            ScrollToWebElement(elementVarName);
-            Rectangle webRectVarName = GetWebElementRect(elementVarName);
-            return CalculateNativeRect(webRectVarName);
-        }
-
-        public Rectangle FindWebElementRectOnScrollable(params By[] locators)
-        {
-            Log($"Finding web element rectangle on scrollable with locator: {Utils.GetLocatorText(locators)}");
-            var foundElement = FindElementOnScrollableInContext(true, locators);
-            var webRect = GetWebElementRect(foundElement);
-            return CalculateNativeRect(webRect);
-        }
-
         public Object ExecuteScriptOnWebElement(AppiumWebElement element, string command)
         {
             string script = File.ReadAllText("../../../test/resources/execute-script-on-web-element.js", Encoding.UTF8);
@@ -481,6 +469,62 @@ namespace AppiumTest
             }
         }
 
+        private AppiumWebElement FindVisibleElementCore(int timeoutInMiliSeconds, params By[] locators)
+        {
+            List<AppiumWebElement> foundElements = FindElementsBy(null, timeoutInMiliSeconds, locators);
+            AppiumWebElement visibleElement = null;
+
+            foreach (AppiumWebElement element in foundElements)
+            {
+                bool visible;
+
+                if (IsNativeContext())
+                {
+                    var rect = element.Rect;
+                    visible = element.Displayed && rect.X >=0 && rect.Y >= 0 && rect.Width > 0 && rect.Height > 0;
+                }
+                else
+                {
+                    string res = (string)ExecuteScriptOnWebElement(element, "isElementVisible");
+                    visible = "true".Equals(res);
+                }
+
+                if (visible)
+                {
+                    visibleElement = element;
+                    break;
+                }
+            }
+
+            if (visibleElement == null)
+                throw new Exception($"Cannot find visible element by: {Utils.GetLocatorText(locators)}");
+
+            if (!IsNativeContext())
+            {
+                ScrollToWebElement(visibleElement);
+            }
+
+            return visibleElement;
+        }
+
+        public AppiumWebElement FindVisibleElement(int timeoutInMiliSeconds, params By[] locators)
+        {
+            return Utils.Retry((attempt) =>
+            {
+                Log($"Finding visible element {Utils.ConvertToOrdinal(attempt)} attempt with locator: {Utils.GetLocatorText(locators)}");
+                return FindVisibleElementCore(timeoutInMiliSeconds, locators);
+            }, (_, _) =>
+            {
+                // Prevent switching to the wrong web context by trying a different one
+                if (!IsNativeContext())
+                {
+                    SwitchToWebContext();
+                }
+
+                return 0;
+            }, IsNativeContext() ? 1 : 3, 3000);
+        }
+
         private AppiumWebElement FindSingleElementBy(By locator)
         {
             Log("Find element by: " + locator);
@@ -566,12 +610,25 @@ namespace AppiumTest
             params By[] locators)
         {
             List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, true, locators);
+            // flex correct could switch context on the fly
+            if (IsFlexCorrectEnabled())
+            {
+                UpdateCurrentContext();
+            }
+
             return foundElements.ElementAt(0);
         }
 
         public AppiumWebElement FindElementBy(params By[] locators)
         {
-            return FindElementBy(null, Config.ImplicitWaitInMs, locators);
+            var foundElements = FindElementBy(null, Config.ImplicitWaitInMs, locators);
+            // flex correct could switch context on the fly
+            if (IsFlexCorrectEnabled())
+            {
+                UpdateCurrentContext();
+            }
+
+            return foundElements;
         }
 
         public AppiumWebElement FindElementBy(int timeoutInMiliSeconds, params By[] locators)
@@ -579,7 +636,7 @@ namespace AppiumTest
             return FindElementBy(null, Math.Max(Config.ImplicitWaitInMs, timeoutInMiliSeconds), locators);
         }
 
-        public List<AppiumWebElement> FindElementsBy(AppiumWebElement rootElement, int timeoutInMiliSeconds,
+        public List<AppiumWebElement> FindElementsBy(AppiumWebElement? rootElement, int timeoutInMiliSeconds,
             params By[] locators)
         {
             List<AppiumWebElement> foundElements = FindElements(rootElement, timeoutInMiliSeconds, true, locators);
@@ -594,7 +651,7 @@ namespace AppiumTest
         /**
          * Scroll to find best element on scrollable
          */
-        public AppiumWebElement FindElementOnScrollableInContext(bool isWebContext, params By[] locators)
+        public AppiumWebElement FindVisibleElementOnScrollable(int timeoutInMiliSeconds, params By[] locators)
         {
             var infoJsonString = File.ReadAllText($"../../../test/resources/{GetCurrentCommandId()}.json", Encoding.UTF8);
             dynamic infoObject = JsonConvert.DeserializeObject(infoJsonString);
@@ -605,34 +662,14 @@ namespace AppiumTest
             var touchableElement = Utils.Retry<AppiumWebElement>(
                 (attempt) =>
                 {
-                    if (isWebContext && attempt == 1)
-                    {
-                        SwitchToWebContext();
-                    }
-
-                    AppiumWebElement foundElement;
-                    if (isWebContext)
-                    {
-                        foundElement = FindVisibleWebElement(locators);
-                        ScrollToWebElement(foundElement);
-                    }
-                    else
-                    {
-                        foundElement = FindElementBy(locators);
-                        var rect = foundElement.Rect;
-                        if (!foundElement.Displayed || rect.X < 0 || rect.Y < 0 || rect.Width == 0 || rect.Height == 0)
-                        {
-                            throw new Exception("Element is found but is not visible");
-                        }
-                    }
-
-                    return foundElement;
+                    Log($"Finding visible element on scrollable {Utils.ConvertToOrdinal(attempt)} attempt  with locator: {Utils.GetLocatorText(locators)}");
+                    return FindVisibleElementCore(timeoutInMiliSeconds, locators);
                 },
                 (exception, attempt) =>
                 {
-                    Log($"Cannot find touchable element {Utils.ConvertToOrdinal(attempt)} attempt, error: {exception.Message}");
+                    Log($"Cannot find visible element {Utils.ConvertToOrdinal(attempt)} attempt, error: {exception.Message}");
                     // Might switch to the wrong web context on the first attempt; retry before scrolling down
-                    if (isWebContext && attempt == 1) {
+                    if (!IsNativeContext() && attempt == 1) {
                         // Wait a bit for web is fully loaded
                         sleep(10000);
                         SwitchToWebContext();
@@ -669,45 +706,16 @@ namespace AppiumTest
 
             if (touchableElement == null)
             {
-                throw new Exception("Cannot find any element on scrollable parent");
+                throw new Exception("Cannot find any visible element on scrollable");
             }
 
             return touchableElement;
-        }
-
-        public AppiumWebElement FindElementOnScrollable(params By[] locators)
-        {
-            return FindElementOnScrollableInContext(false, locators);
         }
 
         public bool IsButtonElement(AppiumWebElement element)
         {
             var tagName = GetTagOfElement(element);
             return tagName != null && tagName.Contains("Button");
-        }
-
-        public AppiumWebElement FindVisibleWebElement(params By[] locators)
-        {
-            string locatorText = Utils.GetLocatorText(locators);
-            Log($"Find visible web element by: {locatorText}");
-
-            List<AppiumWebElement> foundElements = FindElementsBy(locators);
-            AppiumWebElement visibleElement = null;
-            foreach (AppiumWebElement element in foundElements)
-            {
-                string res = (string)ExecuteScriptOnWebElement(element, "isElementVisible");
-                bool visible = "true".Equals(res);
-                if (visible)
-                {
-                    visibleElement = element;
-                    break;
-                }
-            }
-
-            if (visibleElement == null)
-                throw new Exception($"Cannot find visible web element by: {locatorText}");
-
-            return visibleElement;
         }
 
         public AppiumWebElement FindWebview()
@@ -762,7 +770,18 @@ namespace AppiumTest
         {
             Log($"Touch on element {GetTagOfElement(element)} at relative point ({relativePointX} {relativePointY})");
 
-            TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, element.Rect));
+            Rectangle nativeRect;
+            if (IsNativeContext())
+            {
+                nativeRect = element.Rect;
+            }
+            else
+            {
+                var webRect = GetWebElementRect(element);
+                nativeRect = CalculateNativeRect(webRect);
+            }
+
+            TouchAtPoint(GetAbsolutePoint(relativePointX, relativePointY, nativeRect));
         }
 
         /**
@@ -789,6 +808,25 @@ namespace AppiumTest
             sequence.AddAction(finger.CreatePointerDown(MouseButton.Left));
             sequence.AddAction(finger.CreatePointerUp(MouseButton.Left));
             driver.PerformActions(new List<ActionSequence> { sequence });
+        }
+
+        public void SwipeOnElement(AppiumWebElement element, double relativePointX1, double relativePointY1, double relativePointX2, double relativePointY2, int durationInMs)
+        {
+            Log($"Swipe on element ${GetTagOfElement(element)} from relative point ({relativePointX1} {relativePointY1}) to relative point ({relativePointX2} {relativePointY2})");
+            Rectangle nativeRect;
+            if (IsNativeContext())
+            {
+                nativeRect = element.Rect;
+            }
+            else
+            {
+                var webRect = GetWebElementRect(element);
+                nativeRect = CalculateNativeRect(webRect);
+            }
+
+            var fromPoint = GetAbsolutePoint(relativePointX1, relativePointY1, nativeRect);
+            var toPoint = GetAbsolutePoint(relativePointX2, relativePointY2, nativeRect);
+            SwipeByPoint(fromPoint, toPoint, durationInMs);
         }
 
         /**
@@ -1239,6 +1277,13 @@ namespace AppiumTest
         {
             Point center = new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
             return center;
+        }
+
+        public bool IsFlexCorrectEnabled()
+        {
+            var flexCorrect = options.ToCapabilities().GetCapability("kobiton:flexCorrect");
+            return Config.DeviceSource == Config.DeviceSourceEnums.Kobiton &&
+                   flexCorrect is bool b && b;
         }
 
         public Rectangle getRectOfXmlElement(XmlNode element)
