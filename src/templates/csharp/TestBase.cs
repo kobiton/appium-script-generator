@@ -481,7 +481,7 @@ namespace AppiumTest
                 if (IsNativeContext())
                 {
                     var rect = element.Rect;
-                    visible = element.Displayed && rect.X >=0 && rect.Y >= 0 && rect.Width > 0 && rect.Height > 0;
+                    visible = rect.X >=0 && rect.Y >= 0 && rect.Width > 0 && rect.Height > 0;
                 }
                 else
                 {
@@ -1015,10 +1015,12 @@ namespace AppiumTest
                         PressAndroidKey(AndroidKeyCode.Home);
                     }
 
+                    sleep(Config.IdleDelayInMs);
                     break;
 
                 case PressTypes.Back:
                     PressAndroidKey(AndroidKeyCode.Back);
+                    sleep(Config.IdleDelayInMs);
                     break;
 
                 case PressTypes.Power:
@@ -1039,10 +1041,12 @@ namespace AppiumTest
                         PressAndroidKey(AndroidKeyCode.Keycode_POWER);
                     }
 
+                    sleep(Config.IdleDelayInMs);
                     break;
 
                 case PressTypes.AppSwitch:
                     PressAndroidKey(AndroidKeyCode.Keycode_APP_SWITCH);
+                    sleep(Config.IdleDelayInMs);
                     break;
 
                 case PressTypes.Enter:
@@ -1055,6 +1059,7 @@ namespace AppiumTest
                         PressAndroidKey(AndroidKeyCode.Enter);
                     }
 
+                    sleep(Config.IdleDelayInMs);
                     break;
 
                 case PressTypes.Delete:
@@ -1111,6 +1116,27 @@ namespace AppiumTest
         public void PressAndroidKey(int key)
         {
             GetAndroidDriver().PressKeyCode(key);
+        }
+
+        public void ActivateApp(string appPackage)
+        {
+            Log($"Activate app {appPackage}");
+            driver.ActivateApp(appPackage);
+            sleep(Config.IdleDelayInMs);
+        }
+
+        public void RotateScreen(ScreenOrientation orientation)
+        {
+            Log($"Rotate screen to {orientation}");
+            driver.Orientation = orientation;
+            sleep(Config.IdleDelayInMs);
+        }
+
+        public void SetLocation(Location location)
+        {
+            Log($"Set location to Latitude: {location.Latitude}, Longitude: {location.Longitude}, Altitude: {location.Altitude}");
+            driver.Location = location;
+            sleep(Config.IdleDelayInMs);
         }
 
         public void HideKeyboard()

@@ -314,7 +314,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
       switch (actionCommand) {
         case 'activateApp': {
           const {appPackage} = action
-          lines.push(new Line(`driver.activateApp("${appPackage}");`))
+          lines.push(new Line(`activateApp("${appPackage}");`))
         } break
 
         case 'touchOnElement': {
@@ -412,13 +412,13 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
 
         case 'rotate': {
           const {orientation} = action
-          lines.push(new Line(`driver.rotate(ScreenOrientation.${orientation});`))
+          lines.push(new Line(`rotateScreen(ScreenOrientation.${orientation});`))
         } break
 
         case 'setLocation': {
           const {lat, long} = action
           // eslint-disable-next-line max-len
-          lines.push(new Line(`driver.setLocation(new Location((long)Double.parseDouble("${lat}"), (long)Double.parseDouble("${long}"), 0.0));`))
+          lines.push(new Line(`setLocation(new Location((long)Double.parseDouble("${lat}"), (long)Double.parseDouble("${long}"), 0.0));`))
         } break
 
         case 'generateRandomPhoneNumber': {
