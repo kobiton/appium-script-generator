@@ -420,8 +420,7 @@ export default class TestBase {
       let visible
       if (this.isNativeContext()) {
         const rect = await this.getRect(element)
-        const isElementVisible = (await this._driver.elementIdDisplayed(element.ELEMENT)).value
-        visible = isElementVisible && rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0
+        visible = rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0
       }
       else {
         const isElementVisible = await this.executeScriptOnWebElement(element, 'isElementVisible')
@@ -833,10 +832,13 @@ export default class TestBase {
         else {
           await this._driver.pressKeycode('3')
         }
+
+        await this.sleep(Config.IDLE_DELAY_IN_MS)
         break
 
       case PRESS_TYPES.BACK:
         await this._driver.pressKeycode('4')
+        await this.sleep(Config.IDLE_DELAY_IN_MS)
         break
 
       case PRESS_TYPES.POWER:
@@ -848,14 +850,18 @@ export default class TestBase {
         else {
           await this._driver.pressKeycode('26')
         }
+
+        await this.sleep(Config.IDLE_DELAY_IN_MS)
         break
 
       case PRESS_TYPES.APP_SWITCH:
         await this._driver.pressKeycode('187')
+        await this.sleep(Config.IDLE_DELAY_IN_MS)
         break
 
       case PRESS_TYPES.ENTER:
         this._isIos ? await this.sendKeys('\n') : await this._driver.pressKeycode('66')
+        await this.sleep(Config.IDLE_DELAY_IN_MS)
         break
 
       case PRESS_TYPES.DELETE:
@@ -914,12 +920,25 @@ export default class TestBase {
   }
 
   async activateApp(appId) {
+    console.log(`Activate app ${appId}`)
     const response = await axios.post(
       `${this._proxy.getServerUrl()}/wd/hub/session/${this._driver.requestHandler.sessionID}/appium/device/activate_app`,
       {bundleId: appId}
     )
-
+    await this.sleep(Config.IDLE_DELAY_IN_MS)
     return response.data.value
+  }
+
+  async rotateScreen(orientation) {
+    console.log(`Rotate screen to ${orientation}`)
+    await this._driver.setOrientation(orientation)
+    await this.sleep(Config.IDLE_DELAY_IN_MS)
+  }
+
+  async setLocation(location) {
+    console.log(`Set location to ${JSON.stringify(location)}`)
+    await this._driver.setGeoLocation(location)
+    await this.sleep(Config.IDLE_DELAY_IN_MS)
   }
 
   async getWindowRect() {

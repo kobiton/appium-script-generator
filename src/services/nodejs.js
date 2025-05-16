@@ -365,13 +365,13 @@ export default class NodejsAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'rotate': {
           const {orientation} = action
-          lines.push(new Line(`await this.driver.rotate(ScreenOrientation.${orientation})`))
+          lines.push(new Line(`await this.rotateScreen(ORIENTATIONS.${orientation})`))
         } break
 
         case 'setLocation': {
           const {lat, long} = action
           // eslint-disable-next-line max-len
-          lines.push(new Line(`await this._driver.setGeoLocation({latitude: ${lat}, longitude: ${long}, altitude: 0})`))
+          lines.push(new Line(`await this.setLocation({latitude: ${lat}, longitude: ${long}, altitude: 0})`))
         } break
 
         case 'generateRandomPhoneNumber': {

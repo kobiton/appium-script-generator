@@ -26,6 +26,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.*;
+import org.openqa.selenium.html5.Location;
 import org.openqa.selenium.interactions.KeyInput;
 import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
@@ -408,7 +409,7 @@ public class TestBase {
 
             if (isNativeContext()) {
                 Rectangle rect = element.getRect();
-                visible = element.isDisplayed() && rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0;
+                visible = rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0;
             }
             else {
                 String res = (String) executeScriptOnWebElement(element, "isElementVisible");
@@ -858,10 +859,13 @@ public class TestBase {
                 } else {
                     pressAndroidKey(AndroidKey.HOME);
                 }
+
+                sleep(Config.IDLE_DELAY_IN_MS);
                 break;
 
             case BACK:
                 pressAndroidKey(AndroidKey.BACK);
+                sleep(Config.IDLE_DELAY_IN_MS);
                 break;
 
             case POWER:
@@ -875,10 +879,13 @@ public class TestBase {
                 } else {
                     pressAndroidKey(AndroidKey.POWER);
                 }
+
+                sleep(Config.IDLE_DELAY_IN_MS);
                 break;
 
             case APP_SWITCH:
                 pressAndroidKey(AndroidKey.APP_SWITCH);
+                sleep(Config.IDLE_DELAY_IN_MS);
                 break;
 
             case ENTER:
@@ -887,6 +894,8 @@ public class TestBase {
                 } else {
                     pressAndroidKey(AndroidKey.ENTER);
                 }
+
+                sleep(Config.IDLE_DELAY_IN_MS);
                 break;
 
             case DELETE:
@@ -924,6 +933,24 @@ public class TestBase {
 
     public void pressAndroidKey(AndroidKey key) {
         getAndroidDriver().pressKey(new KeyEvent(key));
+    }
+
+    public void activateApp(String appPackage) {
+        System.out.println(String.format("Activate app %s", appPackage));
+        driver.activateApp(appPackage);
+        sleep(Config.IDLE_DELAY_IN_MS);
+    }
+
+    public void rotateScreen(ScreenOrientation orientation) {
+        System.out.println(String.format("Rotate screen to %s", orientation));
+        driver.rotate(orientation);
+        sleep(Config.IDLE_DELAY_IN_MS);
+    }
+
+    public void setLocation(Location location) {
+        System.out.println(String.format("Set location to %s", location));
+        driver.setLocation(location);
+        sleep(Config.IDLE_DELAY_IN_MS);
     }
 
     public void hideKeyboard() {
@@ -1009,9 +1036,13 @@ public class TestBase {
         return new Point((int) x, (int) y);
     }
 
-    public void sleep(int durationInMs) throws InterruptedException {
+    public void sleep(int durationInMs) {
         System.out.println(String.format("Sleep for %d ms", durationInMs));
-        Thread.sleep(durationInMs);
+        try {
+            Thread.sleep(durationInMs);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     protected Document loadXMLFromString(String xml) {
