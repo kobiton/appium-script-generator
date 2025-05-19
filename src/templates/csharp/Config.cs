@@ -20,6 +20,7 @@ namespace AppiumTest
         public const int DeviceWaitingMaxTryTimes = 5;
         public const int DeviceWaitingInternalInMs = 30000;
         public const int SendKeysDelayInMs = 1500;
+        public const int IdleDelayInMs = 3000;
         public const string KobitonApiUrl = "{{KobitonApiUrl}}";
         {{kobitonCredential}}
 

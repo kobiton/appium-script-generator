@@ -10,6 +10,7 @@ export const Config = {
   DEVICE_WAITING_INTERVAL_IN_MS: 30000,
   NEW_COMMAND_TIMEOUT_IN_MS: 15 * 60 * 1000,
   SEND_KEYS_DELAY_IN_MS: 1500,
+  IDLE_DELAY_IN_MS: 3000,
   KOBITON_API_URL: '{{kobitonApiUrl}}',
 
   getAppiumServerUrlWithAuth() {
