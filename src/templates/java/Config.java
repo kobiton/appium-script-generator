@@ -17,6 +17,7 @@ public class Config {
     public static final int DEVICE_WAITING_MAX_TRY_TIMES = 5;
     public static final int DEVICE_WAITING_INTERVAL_IN_MS = 30000;
     public static final int SEND_KEYS_DELAY_IN_MS = 1500;
+    public static final int IDLE_DELAY_IN_MS = 3000;
     public static final String KOBITON_API_URL = "{{kobiton_api_url}}";
     {{kobitonCredential}}
 

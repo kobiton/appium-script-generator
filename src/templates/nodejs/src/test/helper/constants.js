@@ -11,3 +11,8 @@ export const PRESS_TYPES = {
   ENTER: 'ENTER',
   DELETE: 'DELETE'
 }
+
+export const ORIENTATIONS = {
+  PORTRAIT: 'PORTRAIT',
+  LANDSCAPE: 'LANDSCAPE'
+}

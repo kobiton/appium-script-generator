@@ -286,7 +286,7 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
       switch (actionCommand) {
         case 'activateApp': {
           const {appPackage} = action
-          lines.push(new Line(`driver.ActivateApp("${appPackage}");`))
+          lines.push(new Line(`ActivateApp("${appPackage}");`))
         } break
 
         case 'touchOnElement': {
@@ -385,13 +385,13 @@ export default class CSharpAppiumScriptGenerator extends BaseAppiumScriptGenerat
         case 'rotate': {
           const {orientation} = action
           const orientationStr = upperFirst(camelCase(orientation))
-          lines.push(new Line(`driver.Orientation = ScreenOrientation.${orientationStr};`))
+          lines.push(new Line(`RotateScreen(ScreenOrientation.${orientationStr});`))
         } break
 
         case 'setLocation': {
           const {lat, long} = action
           // eslint-disable-next-line max-len
-          lines.push(new Line(`driver.Location = new Location {Latitude = ${lat}, Longitude = ${long}, Altitude = 0};`))
+          lines.push(new Line(`SetLocation(new Location {Latitude = ${lat}, Longitude = ${long}, Altitude = 0});`))
         } break
 
         case 'generateRandomPhoneNumber': {
