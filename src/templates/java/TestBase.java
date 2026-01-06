@@ -54,7 +54,6 @@ public class TestBase {
     public double retinaScale;
     public String deviceName, platformVersion;
 
-    public static String IOS_XPATH_REDUNDANT_PREFIX = "/AppiumAUT";
     public static String NATIVE_CONTEXT = "NATIVE_APP";
 
     enum PRESS_TYPES {HOME, BACK, POWER, APP_SWITCH, ENTER, DELETE}
@@ -362,7 +361,7 @@ public class TestBase {
                         );
 
                         if (!webviewRect.equals(firstChildRect) && Utils.isRectangleInclude(webviewRect, firstChildRect)) {
-                            String topToolbarXpath = Utils.getXPath(firstChildElement).replace(IOS_XPATH_REDUNDANT_PREFIX, "");
+                            String topToolbarXpath = Utils.getXPath(firstChildElement);
                             topToolbar = findSingleElementBy(By.xpath(topToolbarXpath));
                             break;
                         }

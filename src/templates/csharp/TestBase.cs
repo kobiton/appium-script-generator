@@ -38,7 +38,6 @@ namespace AppiumTest
         private string? currentContext;
         private string currentWindow;
 
-        public static string IosXpathRedundantPrefix = "/AppiumAUT";
         public static string NativeContext = "NATIVE_APP";
         private const int SleepAfterAction = 200;
 
@@ -425,7 +424,7 @@ namespace AppiumTest
                             if (!webviewRect.Equals(firstChildRect) &&
                                 Utils.IsRectangleInclude(webviewRect, firstChildRect))
                             {
-                                string topToolbarXpath = Utils.GetXPath(firstChildElement).Replace(IosXpathRedundantPrefix, "");
+                                string topToolbarXpath = Utils.GetXPath(firstChildElement);
                                 topToolbar = FindSingleElementBy(By.XPath(topToolbarXpath));
                                 break;
                             }
