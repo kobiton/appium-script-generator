@@ -53,6 +53,9 @@ export function buildCode({language, lines, initialIndent = 0}) {
     case LANGUAGES.NODEJS:
       space = '  '
       break
+    case LANGUAGES.PYTHON:
+      space = '    '
+      break
     case LANGUAGES.CSHARP:
       space = '    '
       break

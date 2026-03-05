@@ -3,6 +3,7 @@ import path from 'path'
 import {URL} from 'url'
 import get from 'lodash/get'
 import snakeCase from 'lodash/snakeCase'
+import isString from 'lodash/isString'
 import {DEVICE_SOURCES, CONTEXTS, LANGUAGES} from './constant'
 import {buildCode, Line} from '../models/line'
 import compress from '../utils/compress'
@@ -12,9 +13,6 @@ import {BaseAppiumScriptGenerator} from './base'
 const LOCATOR_VAR_NAME_PREFIX = 'locator'
 const ncpAsync = BPromise.promisify(require('ncp').ncp)
 
-/**
- * Generates Python pytest code for Appium scripts.
- */
 export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerator {
   constructor({debugNamespace = 'script-generator'}) {
     super()
@@ -40,7 +38,9 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
       desiredCapabilitiesOfDevices, devices, deviceSource, appUnderTest
     })
 
-    const testCaseLines = this._generateTestCaseLines({devices})
+    const testCaseLines = this._generateTestCaseLines({
+      devices, appUnderTest, deviceSource
+    })
 
     const outputFile = await this._packageProject({
       serverInfo,
@@ -117,7 +117,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
     return lines
   }
 
-  _generateTestCaseLines({devices}) {
+  _generateTestCaseLines({devices, appUnderTest, deviceSource}) {
     const lines = []
     const desiredCapsMethodNames = new Set()
 
@@ -141,6 +141,10 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
       )
       const testDescription = `Run test on ${deviceName} - ${get(device, 'capabilities.platformName')} ${get(device, 'capabilities.platformVersion')}`
 
+      const capsCall = (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName)
+        ? `Config.${desiredCapsMethodName}()`
+        : `Config.${desiredCapsMethodName}(TestApp().get_app_url(${appUnderTest.appVersionId}))`
+
       lines.push(...[
         new Line(`def ${testFnName}():`),
         new Line(`"""${testDescription}"""`, 1),
@@ -149,7 +153,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         new Line(''),
         new Line('try:'),
         new Line('automation_helper = TestApp()', 1),
-        new Line(`capabilities = Config.${desiredCapsMethodName}()`),
+        new Line(`capabilities = ${capsCall}`),
         new Line('automation_helper.find_online_device(capabilities)'),
         new Line(`automation_helper.setup(capabilities, ${retinaScale})`),
         new Line('automation_helper.run()'),
@@ -240,27 +244,44 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'swipeFromElement': {
           const {x1, y1, x2, y2, duration} = action
-          lines.push(new Line(`self.swipe(${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800})`))
-        } break
-
-        case 'pressButton': {
-          const {buttonType} = action
-          lines.push(new Line(`self.press_button('${buttonType}')`))
-        } break
-
-        case 'setText': {
-          const {text} = action
+          !isOnKeyboard && lines.push(new Line('self.hide_keyboard()'))
           const elementVarName = `element${rawLocatorVarName}`
           lines.push(new Line(`${elementVarName} = self.find_visible_element(${findingElementTimeout}, ${locatorVarName})`))
-          lines.push(new Line(`self.send_keys(${elementVarName}, '${text}')`))
+          lines.push(new Line(`self.swipe_on_element(${elementVarName}, ${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800})`))
+        } break
+
+        case 'press': {
+          const {value} = action
+          const count = action.count || 1
+          if (count === 1) {
+            lines.push(new Line(`self.press_button('${value}')`))
+          }
+          else {
+            lines.push(new Line(`self.press_button_multiple('${value}', ${count})`))
+          }
+        } break
+
+        case 'sendKeys': {
+          const {value} = action
+          lines.push(new Line(`self.send_keys_to_active_element(${this._getString(value)})`))
         } break
 
         case 'idle': {
           lines.push(new Line('self.idle()'))
         } break
 
+        case 'rotate': {
+          const {orientation} = action
+          lines.push(new Line(`self.rotate_screen('${orientation}')`))
+        } break
+
+        case 'setLocation': {
+          const {lat, long} = action
+          lines.push(new Line(`self.set_location(${lat}, ${long}, 0)`))
+        } break
+
         default:
-          break
+          throw new Error(`Not support command = ${actionCommand}`)
       }
     }
 
@@ -283,36 +304,38 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
   }) {
     const templateDir = path.join(__dirname, '../templates/python')
     const outputDir = path.join(workingDir, 'python')
+    const outputFile = path.join(workingDir, `${requestScript.name}.zip`)
 
     await createDir(outputDir)
     await ncpAsync(templateDir, outputDir)
 
-    const {portalUrl, kobitonApiUrl, appiumServerUrl, username} = serverInfo
+    const kobitonApiUrl = new URL(serverInfo.apiUrl)
+    const appiumServerUrl = `${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub`
 
     const configPath = path.join(outputDir, 'config.py')
     let configContent = await readFile(configPath, 'utf8')
-    const desiredCapsCode = buildCode(desiredCapsMethodLines, 4)
+    const desiredCapsCode = this._buildPythonCode(desiredCapsMethodLines, 4)
     configContent = configContent.replace('    #{{desiredCaps}}', desiredCapsCode)
-    configContent = configContent.replace('{{username}}', username || '')
-    configContent = configContent.replace('{{appiumServerUrl}}', appiumServerUrl || '')
-    configContent = configContent.replace('{{kobitonApiUrl}}', kobitonApiUrl || '')
+    configContent = configContent.replace('{{username}}', serverInfo.username || '')
+    configContent = configContent.replace('{{appiumServerUrl}}', appiumServerUrl)
+    configContent = configContent.replace('{{kobitonApiUrl}}', serverInfo.apiUrl || '')
     await writeFile(configPath, configContent)
 
     const testAppPath = path.join(outputDir, 'test_app.py')
     let testAppContent = await readFile(testAppPath, 'utf8')
-    const testScriptCode = buildCode(testScriptLines, 8)
+    const testScriptCode = this._buildPythonCode(testScriptLines, 8)
     testAppContent = testAppContent.replace('        {{testScript}}', testScriptCode || '        pass')
     await writeFile(testAppPath, testAppContent)
 
     const testSuitePath = path.join(outputDir, 'test_suite.py')
     let testSuiteContent = await readFile(testSuitePath, 'utf8')
-    const testCasesCode = buildCode(testCaseLines, 0)
+    const testCasesCode = this._buildPythonCode(testCaseLines, 0)
     testSuiteContent = testSuiteContent.replace('{{testCases}}', testCasesCode)
     await writeFile(testSuitePath, testSuiteContent)
 
     const readmePath = path.join(outputDir, 'README.md')
     let readmeContent = await readFile(readmePath, 'utf8')
-    readmeContent = readmeContent.replace(/\{\{portalUrl\}\}/g, portalUrl || '')
+    readmeContent = readmeContent.replace(/\{\{portalUrl\}\}/g, serverInfo.portalUrl || '')
     readmeContent = readmeContent.replace(/\{\{manualSessionId\}\}/g, manualSessionId || '')
     await writeFile(readmePath, readmeContent)
 
@@ -320,9 +343,94 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
       await writeFile(path.join(outputDir, filename), content)
     }
 
-    const outputFile = path.join(workingDir, 'python.zip')
-    await compress(outputDir, outputFile)
+    await compress([{source: outputDir, name: false, type: 'dir'}], outputFile)
 
     return outputFile
+  }
+
+  _getLocatorCode({step, locatorVarName}) {
+    const {selectorConfigurations} = step
+
+    const getLocatorStatement = ({selector}) => {
+      const value = selector.value.replace(/'/g, '"')
+      let appiumBy
+
+      switch (selector.type) {
+        case 'accessibilityId':
+          appiumBy = 'AppiumBy.ACCESSIBILITY_ID'
+          break
+        case 'id':
+          appiumBy = 'AppiumBy.ID'
+          break
+        case 'name':
+          appiumBy = 'AppiumBy.NAME'
+          break
+        case 'className':
+          appiumBy = 'AppiumBy.CLASS_NAME'
+          break
+        case 'linkText':
+          appiumBy = 'By.LINK_TEXT'
+          break
+        case 'css':
+          appiumBy = 'By.CSS_SELECTOR'
+          break
+        case 'xpath':
+          appiumBy = 'AppiumBy.XPATH'
+          break
+        default:
+          throw new Error(`Unsupported selector type: ${selector.type}`)
+      }
+
+      return `(${appiumBy}, "${value}")`
+    }
+
+    const lines = []
+
+    if (selectorConfigurations.length > 1) {
+      lines.push(new Line(`${locatorVarName} = None`))
+      selectorConfigurations.forEach((selectorConfiguration, index) => {
+        const {selectors, device} = selectorConfiguration
+        const {deviceName, platformVersion} = device || {}
+        let ifStatement
+
+        if (!device || index === selectorConfigurations.length - 1) {
+          ifStatement = 'else:'
+        }
+        else if (index === 0) {
+          ifStatement = `if '${deviceName}' == device_name and '${platformVersion}' == platform_version:`
+        }
+        else {
+          ifStatement = `elif '${deviceName}' == device_name and '${platformVersion}' == platform_version:`
+        }
+
+        const locatorsStatements = selectors.map((selector) => getLocatorStatement({selector}))
+        lines.push(new Line(ifStatement))
+        lines.push(new Line(`${locatorVarName} = [${locatorsStatements.join(', ')}]`, 1))
+      })
+    }
+    else if (selectorConfigurations.length === 1) {
+      const {selectors} = selectorConfigurations[0]
+      const locatorsStatements = selectors.map((selector) => getLocatorStatement({selector}))
+      lines.push(new Line(`${locatorVarName} = [${locatorsStatements.join(', ')}]`))
+    }
+
+    return lines
+  }
+
+  _buildPythonCode(lines, initialIndent) {
+    return buildCode({language: LANGUAGES.PYTHON, initialIndent, lines})
+  }
+
+  _getString(value) {
+    let str
+    if (isString(value)) {
+      str = value
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+    }
+    else {
+      str = value
+    }
+    return `'${str}'`
   }
 }
