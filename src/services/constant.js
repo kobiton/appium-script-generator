@@ -96,14 +96,16 @@ export const CONTEXTS = keyMirror({
 export const LANGUAGES = {
   JAVA: 'java',
   NODEJS: 'nodejs',
-  CSHARP: 'csharp'
+  CSHARP: 'csharp',
+  PYTHON: 'python'
 }
 
 export const FRAMEWORK_NAMES = {
   JUNIT: 'junit',
   TESTNG: 'testng',
   MOCHA: 'mocha',
-  NUNIT: 'nunit'
+  NUNIT: 'nunit',
+  PYTEST: 'pytest'
 }
 
 export const MOBILE_BROWSER_PACKAGE_NAMES = {
