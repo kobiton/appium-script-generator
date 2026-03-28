@@ -45,7 +45,7 @@ jobs:
   build-push-image:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     name: Build and Push image to ECR
-    uses: kobiton/deployment/.github/workflows/ci.yaml@KOB-52442
+    uses: kobiton/deployment/.github/workflows/ci.yaml@master
     with:
       git-ref: ${{ github.event.inputs.git-ref }}
       repo-name: 'appium-script-generator'
