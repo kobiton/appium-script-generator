@@ -39,7 +39,8 @@ jobs:
     name: Quality Assurance
     uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@KOB-52442
     with:
-      node-version: '20.10.0'
+      node-version: '22.13.1'
+      sync-submodule: 'true'
     secrets: inherit
 
   build-push-image:
