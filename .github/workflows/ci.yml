@@ -37,7 +37,7 @@ jobs:
   lint-test:
     if: ${{ github.event_name == 'pull_request' }}
     name: Quality Assurance
-    uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@master
+    uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@KOB-52442
     with:
       node-version: '20.10.0'
     secrets: inherit
@@ -45,7 +45,7 @@ jobs:
   build-push-image:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     name: Build and Push image to ECR
-    uses: kobiton/deployment/.github/workflows/ci.yaml@master
+    uses: kobiton/deployment/.github/workflows/ci.yaml@KOB-52442
     with:
       git-ref: ${{ github.event.inputs.git-ref }}
       repo-name: 'appium-script-generator'
@@ -55,13 +55,13 @@ jobs:
 
   detect-target-env:
     if: ${{ github.event_name == 'pull_request' }}
-    uses: kobiton/deployment/.github/workflows/detect-target-env.yaml@master
+    uses: kobiton/deployment/.github/workflows/detect-target-env.yaml@KOB-52442
     secrets: inherit
 
   sonar:
     if: ${{ github.event_name == 'pull_request' }}
     name: SonarCloud
-    uses: kobiton/deployment/.github/workflows/sonar.yaml@master
+    uses: kobiton/deployment/.github/workflows/sonar.yaml@KOB-52442
     with:
       node-version: '20.10.0'
     secrets: inherit
@@ -70,7 +70,7 @@ jobs:
     needs: [lint-test, sonar, detect-target-env]
     if: ${{ github.event_name == 'pull_request' }}
     name: Build and Push image to ECR (PR)
-    uses: kobiton/deployment/.github/workflows/ci.yaml@master
+    uses: kobiton/deployment/.github/workflows/ci.yaml@KOB-52442
     with:
       repo-name: 'appium-script-generator'
       sandbox-env: ${{ needs.detect-target-env.outputs.environment }}
