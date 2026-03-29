@@ -74,7 +74,8 @@ jobs:
     name: Build and Push image to ECR (PR)
     uses: kobiton/deployment/.github/workflows/ci.yaml@KOB-52442
     with:
-      repo-name: 'appium-script-generator'
+      repo-name: appium-script-generator
+      sync-submodule: 'true'
       sandbox-env: ${{ needs.detect-target-env.outputs.environment }}
       branch-name: ${{ github.head_ref }}
     secrets: inherit
