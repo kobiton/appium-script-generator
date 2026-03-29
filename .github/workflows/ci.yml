@@ -68,7 +68,8 @@ jobs:
     secrets: inherit
 
   build-push-image-pr:
-    needs: [lint-test, sonar, detect-target-env]
+    # needs: [lint-test, sonar, detect-target-env]
+    needs: [detect-target-env]
     if: ${{ github.event_name == 'pull_request' }}
     name: Build and Push image to ECR (PR)
     uses: kobiton/deployment/.github/workflows/ci.yaml@KOB-52442
