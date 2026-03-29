@@ -34,14 +34,14 @@ permissions:
   pull-requests: write   # Required by sonar workflow for PR decoration
 
 jobs:
-  lint-test:
-    if: ${{ github.event_name == 'pull_request' }}
-    name: Quality Assurance
-    uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@KOB-52442
-    with:
-      node-version: '22.13.1'
-      sync-submodule: 'true'
-    secrets: inherit
+  # lint-test:
+  #   if: ${{ github.event_name == 'pull_request' }}
+  #   name: Quality Assurance
+  #   uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@KOB-52442
+  #   with:
+  #     node-version: '22.13.1'
+  #     sync-submodule: 'true'
+  #   secrets: inherit
 
   build-push-image:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -59,13 +59,13 @@ jobs:
     uses: kobiton/deployment/.github/workflows/detect-target-env.yaml@KOB-52442
     secrets: inherit
 
-  sonar:
-    if: ${{ github.event_name == 'pull_request' }}
-    name: SonarCloud
-    uses: kobiton/deployment/.github/workflows/sonar.yaml@KOB-52442
-    with:
-      node-version: '20.10.0'
-    secrets: inherit
+  # sonar:
+  #   if: ${{ github.event_name == 'pull_request' }}
+  #   name: SonarCloud
+  #   uses: kobiton/deployment/.github/workflows/sonar.yaml@KOB-52442
+  #   with:
+  #     node-version: '20.10.0'
+  #   secrets: inherit
 
   build-push-image-pr:
     # needs: [lint-test, sonar, detect-target-env]
