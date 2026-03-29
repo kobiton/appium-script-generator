@@ -37,7 +37,7 @@ jobs:
   # lint-test:
   #   if: ${{ github.event_name == 'pull_request' }}
   #   name: Quality Assurance
-  #   uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@KOB-52442
+  #   uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@master
   #   with:
   #     node-version: '22.13.1'
   #     sync-submodule: 'true'
@@ -62,7 +62,7 @@ jobs:
   # sonar:
   #   if: ${{ github.event_name == 'pull_request' }}
   #   name: SonarCloud
-  #   uses: kobiton/deployment/.github/workflows/sonar.yaml@KOB-52442
+  #   uses: kobiton/deployment/.github/workflows/sonar.yaml@master
   #   with:
   #     node-version: '20.10.0'
   #   secrets: inherit
