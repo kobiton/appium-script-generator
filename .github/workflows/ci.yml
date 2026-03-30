@@ -34,14 +34,14 @@ permissions:
   pull-requests: write   # Required by sonar workflow for PR decoration
 
 jobs:
-  # lint-test:
-  #   if: ${{ github.event_name == 'pull_request' }}
-  #   name: Quality Assurance
-  #   uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@master
-  #   with:
-  #     node-version: '22.13.1'
-  #     sync-submodule: 'true'
-  #   secrets: inherit
+  lint-test:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Quality Assurance
+    uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@master
+    with:
+      node-version: '22.13.1'
+      sync-submodule: 'true'
+    secrets: inherit
 
   build-push-image:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -56,23 +56,14 @@ jobs:
 
   detect-target-env:
     if: ${{ github.event_name == 'pull_request' }}
-    uses: kobiton/deployment/.github/workflows/detect-target-env.yaml@KOB-52442
+    uses: kobiton/deployment/.github/workflows/detect-target-env.yaml@master
     secrets: inherit
 
-  # sonar:
-  #   if: ${{ github.event_name == 'pull_request' }}
-  #   name: SonarCloud
-  #   uses: kobiton/deployment/.github/workflows/sonar.yaml@master
-  #   with:
-  #     node-version: '20.10.0'
-  #   secrets: inherit
-
   build-push-image-pr:
-    # needs: [lint-test, sonar, detect-target-env]
-    needs: [detect-target-env]
+    needs: [lint-test, detect-target-env]
     if: ${{ github.event_name == 'pull_request' }}
     name: Build and Push image to ECR (PR)
-    uses: kobiton/deployment/.github/workflows/ci.yaml@KOB-52442
+    uses: kobiton/deployment/.github/workflows/ci.yaml@master
     with:
       repo-name: appium-script-generator
       sync-submodule: 'true'
