@@ -1,0 +1,18 @@
+DEVICE_SOURCES = {
+    'KOBITON': 'KOBITON',
+    'OTHER': 'OTHER'
+}
+
+PRESS_TYPES = {
+    'HOME': 'HOME',
+    'BACK': 'BACK',
+    'POWER': 'POWER',
+    'APP_SWITCH': 'APP_SWITCH',
+    'ENTER': 'ENTER',
+    'DELETE': 'DELETE'
+}
+
+ORIENTATIONS = {
+    'PORTRAIT': 'PORTRAIT',
+    'LANDSCAPE': 'LANDSCAPE'
+}
