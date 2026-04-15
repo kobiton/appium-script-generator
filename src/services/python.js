@@ -63,7 +63,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
   _generateDesiredCapabilitiesMethodLines({
     desiredCapabilitiesOfDevices, devices, deviceSource, appUnderTest
   }) {
-    const lines = []
+    const lines = [new Line('')]  // absorb buildCode isFirstLine skip so @classmethod gets proper indentation
     const desiredCapsMethodNames = new Set()
 
     for (const device of devices) {
@@ -102,7 +102,10 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         const parsedValue = this._parseValue(value, type)
         const suffix = index === desiredCapabilities.length - 1 ? '' : ','
         let statement
-        if (typeof parsedValue === 'string') {
+        if (typeof parsedValue === 'boolean') {
+          statement = `'${key}': ${parsedValue ? 'True' : 'False'}${suffix}`
+        }
+        else if (typeof parsedValue === 'string') {
           statement = `'${key}': '${parsedValue}'${suffix}`
         }
         else {
@@ -112,6 +115,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
       })
 
       lines.push(new Line('}', -1))
+      lines.push(new Line('', -1))  // balance indent back to class body level after each method
     }
 
     return lines
@@ -163,11 +167,12 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         new Line('error = err'),
         new Line('if automation_helper:'),
         new Line('automation_helper.save_debug_resource()', 1),
-        new Line('finally:', -1),
+        new Line('finally:', -2),
         new Line('if automation_helper:', 1),
         new Line('automation_helper.cleanup()', 1),
         new Line('', -1),
-        new Line('assert error is None, f"Test case has error: {error}"', -1)
+        new Line('assert error is None, f"Test case has error: {error}"', -1),
+        new Line('', -1)  // balance indent back to module level for next test function
       ])
     }
 
@@ -314,7 +319,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     const configPath = path.join(outputDir, 'config.py')
     let configContent = await readFile(configPath, 'utf8')
-    const desiredCapsCode = this._buildPythonCode(desiredCapsMethodLines, 4)
+    const desiredCapsCode = this._buildPythonCode(desiredCapsMethodLines, 1)
     configContent = configContent.replace('    #{{desiredCaps}}', desiredCapsCode)
     configContent = configContent.replace('{{username}}', serverInfo.username || '')
     configContent = configContent.replace('{{appiumServerUrl}}', appiumServerUrl)
@@ -323,7 +328,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     const testAppPath = path.join(outputDir, 'test_app.py')
     let testAppContent = await readFile(testAppPath, 'utf8')
-    const testScriptCode = this._buildPythonCode(testScriptLines, 8)
+    const testScriptCode = this._buildPythonCode(testScriptLines, 2)
     testAppContent = testAppContent.replace('        {{testScript}}', testScriptCode || '        pass')
     await writeFile(testAppPath, testAppContent)
 
@@ -381,7 +386,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           throw new Error(`Unsupported selector type: ${selector.type}`)
       }
 
-      return `(${appiumBy}, "${value}")`
+      return `(${appiumBy}, '${value}')`
     }
 
     const lines = []
@@ -397,16 +402,18 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           ifStatement = 'else:'
         }
         else if (index === 0) {
-          ifStatement = `if '${deviceName}' == device_name and '${platformVersion}' == platform_version:`
+          ifStatement = `if '${deviceName}' == self._device_name and '${platformVersion}' == self._platform_version:`
         }
         else {
-          ifStatement = `elif '${deviceName}' == device_name and '${platformVersion}' == platform_version:`
+          ifStatement = `elif '${deviceName}' == self._device_name and '${platformVersion}' == self._platform_version:`
         }
 
         const locatorsStatements = selectors.map((selector) => getLocatorStatement({selector}))
-        lines.push(new Line(ifStatement))
+        const branchOffset = index === 0 ? 0 : -1  // elif/else must step back from previous body
+        lines.push(new Line(ifStatement, branchOffset))
         lines.push(new Line(`${locatorVarName} = [${locatorsStatements.join(', ')}]`, 1))
       })
+      lines.push(new Line('', -1))  // close final branch body, return to baseline
     }
     else if (selectorConfigurations.length === 1) {
       const {selectors} = selectorConfigurations[0]

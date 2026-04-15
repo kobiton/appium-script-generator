@@ -1,0 +1,180 @@
+{
+  "sentAt": {
+    "low": 1105187238,
+    "high": 395,
+    "unsigned": true
+  },
+  "serverInfo": {
+    "apiUrl": "https://api.kobiton.com",
+    "portalUrl": "https://portal.kobiton.com",
+    "username": "kobitonadmin+appiumScriptGen",
+    "apiKey": "your_api_key"
+  },
+  "isManualSession": true,
+  "manualSessionId": "605",
+  "devices": [
+    {
+      "id": 1881,
+      "name": "A5 2020",
+      "capabilities": {
+        "platformName": "Android",
+        "platformVersion": "9",
+        "resolution": {
+          "width": 720,
+          "height": 1600,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": 1882,
+      "name": "Galaxy S22",
+      "capabilities": {
+        "platformName": "Android",
+        "platformVersion": "16",
+        "resolution": {
+          "width": 1080,
+          "height": 2340,
+          "scale": 1
+        }
+      }
+    }
+  ],
+  "testSteps": [
+    {
+      "id": "17000",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "device": {
+            "deviceName": "A5 2020",
+            "platformVersion": "9"
+          },
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//*[@resource-id='com.android.chrome:id/url_bar']"
+            }
+          ]
+        },
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//android.widget.EditText[@resource-id='com.android.chrome:id/url_bar']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.387\",\"y\":\"0.430\"}",
+      "findingElementTimeout": 7129,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17001",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"sendKeys\",\"value\":\"kobiton \"}",
+      "findingElementTimeout": 4014,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17002",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"ENTER\"}",
+      "findingElementTimeout": 1612,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17003",
+      "context": "WEB",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "css",
+              "value": "a[href='https://kobiton.com/']"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"touchOnElement\",\"x\":\"0.359\",\"y\":\"0.300\"}",
+      "findingElementTimeout": 8965,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17004",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"rotate\",\"orientation\":\"LANDSCAPE\"}",
+      "findingElementTimeout": 14108,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17005",
+      "context": "NATIVE",
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "(//android.webkit.WebView)[1]"
+            }
+          ]
+        }
+      ],
+      "actionJson": "{\"command\":\"swipeFromElement\",\"x1\":\"0.506\",\"y1\":\"0.815\",\"x2\":\"0.574\",\"y2\":\"0.251\",\"duration\":637}",
+      "findingElementTimeout": 13081,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "17006",
+      "context": "NATIVE",
+      "actionJson": "{\"command\":\"press\",\"value\":\"BACK\"}",
+      "findingElementTimeout": 6526,
+      "isOnKeyboard": false
+    }
+  ],
+  "appUnderTest": {
+    "id": "com.android.chrome"
+  },
+  "desiredCapabilitiesOfDevices": [
+    {
+      "deviceId": 1881,
+      "desiredCapabilities": [
+        {"key": "sessionName",        "value": "Automation on A5 2020", "type": "string"},
+        {"key": "sessionDescription", "value": "",                      "type": "string"},
+        {"key": "deviceOrientation",  "value": "portrait",              "type": "string"},
+        {"key": "noReset",            "value": "false",                 "type": "bool"},
+        {"key": "fullReset",          "value": "true",                  "type": "bool"},
+        {"key": "captureScreenshots", "value": "true",                  "type": "bool"},
+        {"key": "newCommandTimeout",  "value": "900",                   "type": "int"},
+        {"key": "keepScreenOn",       "value": "true",                  "type": "bool"},
+        {"key": "deviceGroup",        "value": "KOBITON",               "type": "string"},
+        {"key": "deviceName",         "value": "A5 2020",               "type": "string"},
+        {"key": "platformVersion",    "value": "9",                     "type": "string"},
+        {"key": "platformName",       "value": "Android",               "type": "string"}
+      ]
+    },
+    {
+      "deviceId": 1882,
+      "desiredCapabilities": [
+        {"key": "sessionName",        "value": "Automation on Galaxy S22", "type": "string"},
+        {"key": "sessionDescription", "value": "",                         "type": "string"},
+        {"key": "deviceOrientation",  "value": "portrait",                 "type": "string"},
+        {"key": "noReset",            "value": "false",                    "type": "bool"},
+        {"key": "fullReset",          "value": "false",                    "type": "bool"},
+        {"key": "captureScreenshots", "value": "true",                     "type": "bool"},
+        {"key": "newCommandTimeout",  "value": "900",                      "type": "int"},
+        {"key": "keepScreenOn",       "value": "true",                     "type": "bool"},
+        {"key": "deviceGroup",        "value": "KOBITON",                  "type": "string"},
+        {"key": "deviceName",         "value": "Galaxy S22",               "type": "string"},
+        {"key": "platformVersion",    "value": "16",                       "type": "string"},
+        {"key": "platformName",       "value": "Android",                  "type": "string"}
+      ]
+    }
+  ],
+  "requestScript": {
+    "name": "kobiton-appium-script-s605-python-pytest",
+    "language": "python",
+    "testingFramework": "pytest"
+  }
+}
