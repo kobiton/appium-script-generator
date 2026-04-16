@@ -21,7 +21,8 @@ class Config:
     @classmethod
     def get_appium_server_url_with_auth(cls):
         parsed = urlparse(cls.APPIUM_SERVER_URL)
-        return f"{parsed.scheme}://{cls.API_USERNAME}:{cls.API_KEY}@{parsed.hostname}:{parsed.port}{parsed.path}"
+        port_part = f":{parsed.port}" if parsed.port else ""
+        return f"{parsed.scheme}://{cls.API_USERNAME}:{cls.API_KEY}@{parsed.hostname}{port_part}{parsed.path}"
 
     @classmethod
     def get_basic_auth_string(cls):

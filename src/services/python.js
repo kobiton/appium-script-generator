@@ -63,7 +63,9 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
   _generateDesiredCapabilitiesMethodLines({
     desiredCapabilitiesOfDevices, devices, deviceSource, appUnderTest
   }) {
-    const lines = []
+    const lines = [
+      new Line('')
+    ]
     const desiredCapsMethodNames = new Set()
 
     for (const device of devices) {
@@ -102,7 +104,10 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         const parsedValue = this._parseValue(value, type)
         const suffix = index === desiredCapabilities.length - 1 ? '' : ','
         let statement
-        if (typeof parsedValue === 'string') {
+        if (typeof parsedValue === 'boolean') {
+          statement = `'${key}': ${parsedValue ? 'True' : 'False'}${suffix}`
+        }
+        else if (typeof parsedValue === 'string') {
           statement = `'${key}': '${parsedValue}'${suffix}`
         }
         else {
@@ -112,6 +117,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
       })
 
       lines.push(new Line('}', -1))
+      lines.push(new Line('', -1))
     }
 
     return lines
@@ -137,9 +143,12 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
       const retinaScale = get(deviceCaps, 'resolution.scale') || 1
       const testFnName = snakeCase(
-        `test ${deviceName} ${get(device, 'capabilities.platformName')} ${get(device, 'capabilities.platformVersion')}`
+        `test ${deviceName} ${get(device, 'capabilities.platformName')} ` +
+        `${get(device, 'capabilities.platformVersion')}`
       )
-      const testDescription = `Run test on ${deviceName} - ${get(device, 'capabilities.platformName')} ${get(device, 'capabilities.platformVersion')}`
+      const testDescription =
+        `Run test on ${deviceName} - ${get(device, 'capabilities.platformName')} ` +
+        `${get(device, 'capabilities.platformVersion')}`
 
       const capsCall = (DEVICE_SOURCES.KOBITON === deviceSource || appUnderTest.browserName)
         ? `Config.${desiredCapsMethodName}()`
@@ -163,11 +172,12 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         new Line('error = err'),
         new Line('if automation_helper:'),
         new Line('automation_helper.save_debug_resource()', 1),
-        new Line('finally:', -1),
+        new Line('finally:', -2),
         new Line('if automation_helper:', 1),
         new Line('automation_helper.cleanup()', 1),
         new Line('', -1),
-        new Line('assert error is None, f"Test case has error: {error}"', -1)
+        new Line('assert error is None, f"Test case has error: {error}"', -1),
+        new Line('', -1)
       ])
     }
 
@@ -224,7 +234,12 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         case 'touchOnElement': {
           const {x, y} = action
           const elementVarName = `element${rawLocatorVarName}`
-          lines.push(new Line(`${elementVarName} = self.find_visible_element(${findingElementTimeout}, ${locatorVarName})`))
+          lines.push(
+            new Line(
+              `${elementVarName} = self.find_visible_element(` +
+              `${findingElementTimeout}, ${locatorVarName})`
+            )
+          )
           lines.push(new Line(`self.touch_on_element(${elementVarName}, ${x}, ${y})`))
         } break
 
@@ -233,7 +248,12 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           resourceFiles[`${id}.json`] = JSON.stringify(elementInfo)
           !isOnKeyboard && lines.push(new Line('self.hide_keyboard()'))
           const elementVarName = `element${rawLocatorVarName}`
-          lines.push(new Line(`${elementVarName} = self.find_visible_element_on_scrollable(${findingElementTimeout}, ${locatorVarName})`))
+          lines.push(
+            new Line(
+              `${elementVarName} = self.find_visible_element_on_scrollable(` +
+              `${findingElementTimeout}, ${locatorVarName})`
+            )
+          )
           lines.push(new Line(`self.touch_on_element(${elementVarName}, ${x}, ${y})`))
         } break
 
@@ -246,8 +266,18 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           const {x1, y1, x2, y2, duration} = action
           !isOnKeyboard && lines.push(new Line('self.hide_keyboard()'))
           const elementVarName = `element${rawLocatorVarName}`
-          lines.push(new Line(`${elementVarName} = self.find_visible_element(${findingElementTimeout}, ${locatorVarName})`))
-          lines.push(new Line(`self.swipe_on_element(${elementVarName}, ${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800})`))
+          lines.push(
+            new Line(
+              `${elementVarName} = self.find_visible_element(` +
+              `${findingElementTimeout}, ${locatorVarName})`
+            )
+          )
+          lines.push(
+            new Line(
+              'self.swipe_on_element(' +
+              `${elementVarName}, ${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800})`
+            )
+          )
         } break
 
         case 'press': {
@@ -266,9 +296,9 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           lines.push(new Line(`self.send_keys_to_active_element(${this._getString(value)})`))
         } break
 
-        case 'idle': {
+        case 'idle':
           lines.push(new Line('self.idle()'))
-        } break
+          break
 
         case 'rotate': {
           const {orientation} = action
@@ -314,7 +344,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     const configPath = path.join(outputDir, 'config.py')
     let configContent = await readFile(configPath, 'utf8')
-    const desiredCapsCode = this._buildPythonCode(desiredCapsMethodLines, 4)
+    const desiredCapsCode = this._buildPythonCode(desiredCapsMethodLines, 1)
     configContent = configContent.replace('    #{{desiredCaps}}', desiredCapsCode)
     configContent = configContent.replace('{{username}}', serverInfo.username || '')
     configContent = configContent.replace('{{appiumServerUrl}}', appiumServerUrl)
@@ -323,8 +353,11 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     const testAppPath = path.join(outputDir, 'test_app.py')
     let testAppContent = await readFile(testAppPath, 'utf8')
-    const testScriptCode = this._buildPythonCode(testScriptLines, 8)
-    testAppContent = testAppContent.replace('        {{testScript}}', testScriptCode || '        pass')
+    const testScriptCode = this._buildPythonCode(testScriptLines, 2)
+    testAppContent = testAppContent.replace(
+      '        {{testScript}}',
+      testScriptCode || '        pass'
+    )
     await writeFile(testAppPath, testAppContent)
 
     const testSuitePath = path.join(outputDir, 'test_suite.py')
@@ -381,7 +414,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           throw new Error(`Unsupported selector type: ${selector.type}`)
       }
 
-      return `(${appiumBy}, "${value}")`
+      return `(${appiumBy}, '${value}')`
     }
 
     const lines = []
@@ -397,16 +430,24 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           ifStatement = 'else:'
         }
         else if (index === 0) {
-          ifStatement = `if '${deviceName}' == device_name and '${platformVersion}' == platform_version:`
+          ifStatement =
+            `if '${deviceName}' == self._device_name and ` +
+            `'${platformVersion}' == self._platform_version:`
         }
         else {
-          ifStatement = `elif '${deviceName}' == device_name and '${platformVersion}' == platform_version:`
+          ifStatement =
+            `elif '${deviceName}' == self._device_name and ` +
+            `'${platformVersion}' == self._platform_version:`
         }
 
         const locatorsStatements = selectors.map((selector) => getLocatorStatement({selector}))
-        lines.push(new Line(ifStatement))
-        lines.push(new Line(`${locatorVarName} = [${locatorsStatements.join(', ')}]`, 1))
+        const branchOffset = index === 0 ? 0 : -1
+        lines.push(new Line(ifStatement, branchOffset))
+        lines.push(
+          new Line(`${locatorVarName} = [${locatorsStatements.join(', ')}]`, 1)
+        )
       })
+      lines.push(new Line('', -1))
     }
     else if (selectorConfigurations.length === 1) {
       const {selectors} = selectorConfigurations[0]
@@ -426,7 +467,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
     if (isString(value)) {
       str = value
         .replace(/\\/g, '\\\\')
-        .replace(/'/g, "\\'")
+        .replace(/'/g, '\\\'')
     }
     else {
       str = value

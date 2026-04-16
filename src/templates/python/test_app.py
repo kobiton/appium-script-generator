@@ -1,5 +1,7 @@
 from test_base import TestBase
 from config import Config
+from appium.webdriver.common.appiumby import AppiumBy
+from selenium.webdriver.common.by import By
 
 
 class TestApp(TestBase):

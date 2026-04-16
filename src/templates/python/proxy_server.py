@@ -9,7 +9,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
     current_command_id = 0
 
     def do_request(self, method, body=None):
-        target_url = Config.get_appium_server_url_with_auth().replace('/wd/hub', '')
+        target_url = Config.APPIUM_SERVER_URL.replace('/wd/hub', '')
         url = f"{target_url}{self.path}"
 
         if self.current_command_id:
@@ -17,6 +17,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             url = f"{url}{separator}baseCommandId={self.current_command_id}"
 
         headers = {key: val for key, val in self.headers.items()}
+        headers['Authorization'] = Config.get_basic_auth_string()
         req = Request(url, data=body, headers=headers, method=method)
 
         try:

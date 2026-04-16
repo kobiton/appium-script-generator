@@ -2,6 +2,7 @@ import time
 import base64
 import requests
 from appium import webdriver
+from appium.options import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -50,7 +51,8 @@ class TestBase:
 
         print(f"Initialize Appium driver with desiredCaps: {desired_caps}")
         server_url = self._proxy.get_server_url() + '/wd/hub'
-        self._driver = webdriver.Remote(server_url, desired_caps)
+        options = AppiumOptions.load_capabilities(desired_caps)
+        self._driver = webdriver.Remote(server_url, options=options)
 
     def cleanup(self):
         if self._driver:
@@ -89,10 +91,15 @@ class TestBase:
             self._driver.switch_to.context(web_context)
             self._current_context = web_context
 
-    def find_visible_element(self, timeout_ms, locator):
-        by, value = locator
+    def find_visible_element(self, timeout_ms, locators):
         wait = WebDriverWait(self._driver, timeout_ms / 1000)
-        return wait.until(EC.visibility_of_element_located((by, value)))
+        last_exception = None
+        for locator in locators:
+            try:
+                return wait.until(EC.visibility_of_element_located(locator))
+            except Exception as e:
+                last_exception = e
+        raise last_exception
 
     def find_visible_element_on_scrollable(self, timeout_ms, locator):
         return self.find_visible_element(timeout_ms, locator)
@@ -119,6 +126,10 @@ class TestBase:
             self._driver.hide_keyboard()
         except Exception:
             pass
+
+    def press_button_multiple(self, button_type, count):
+        for _ in range(count):
+            self.press_button(button_type)
 
     def press_button(self, button_type):
         if self._is_ios:
@@ -149,6 +160,26 @@ class TestBase:
         element.clear()
         element.send_keys(text)
         time.sleep(Config.SEND_KEYS_DELAY_IN_MS / 1000)
+
+    def send_keys_to_active_element(self, text):
+        time.sleep(Config.SEND_KEYS_DELAY_IN_MS / 1000)
+        self._driver.switch_to.active_element.send_keys(text)
+        time.sleep(Config.SEND_KEYS_DELAY_IN_MS / 1000)
+
+    def swipe_on_element(self, element, x1, y1, x2, y2, duration=800):
+        location = element.location
+        size = element.size
+        start_x = int(location['x'] + size['width'] * x1)
+        start_y = int(location['y'] + size['height'] * y1)
+        end_x = int(location['x'] + size['width'] * x2)
+        end_y = int(location['y'] + size['height'] * y2)
+        self._driver.swipe(start_x, start_y, end_x, end_y, duration)
+
+    def rotate_screen(self, orientation):
+        self._driver.orientation = orientation.upper()
+
+    def set_location(self, lat, lng, altitude=0):
+        self._driver.set_location(lat, lng, altitude)
 
     def idle(self):
         time.sleep(Config.IDLE_DELAY_IN_MS / 1000)
