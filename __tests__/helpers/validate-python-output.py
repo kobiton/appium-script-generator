@@ -62,6 +62,55 @@ def validate(zip_path):
         )
 
     # ------------------------------------------------------------------
+    # 2b. test_base.py must import AppiumOptions from a real module path.
+    #     In Appium-Python-Client 3.x/4.x, `from appium.options import
+    #     AppiumOptions` raises ImportError at collection time. Either the
+    #     fully-qualified base path or a platform-specific options class
+    #     is acceptable.
+    # ------------------------------------------------------------------
+    test_base = py_files.get('test_base.py', '')
+    acceptable_options_imports = (
+        'from appium.options.common.base import AppiumOptions',
+        'from appium.options.android import UiAutomator2Options',
+        'from appium.options.ios import XCUITestOptions',
+    )
+    if not any(imp in test_base for imp in acceptable_options_imports):
+        errors.append(
+            'test_base.py: missing or wrong AppiumOptions import — '
+            'must be one of: '
+            '"from appium.options.common.base import AppiumOptions", '
+            '"from appium.options.android import UiAutomator2Options", or '
+            '"from appium.options.ios import XCUITestOptions"'
+        )
+
+    # ------------------------------------------------------------------
+    # 2c. test_base.py find_online_device must accept the newer
+    #     /v1/devices response shape. test-green returns
+    #     privateDevices/favoriteDevices/cloudDevices/etc, NOT
+    #     deviceListData — checking only the legacy key produces
+    #     false-negative "device not available" retries every run.
+    # ------------------------------------------------------------------
+    if "'privateDevices'" not in test_base and 'privateDevices' not in test_base:
+        errors.append(
+            'test_base.py: find_online_device does not recognize the newer '
+            'Kobiton /v1/devices response shape (privateDevices/cloudDevices/...). '
+            'Must union all device category keys, not only deviceListData'
+        )
+
+    # ------------------------------------------------------------------
+    # 2d. proxy_server.py must strip the client Host header before
+    #     forwarding to Kobiton. Without this, the upstream sees
+    #     Host: localhost:<port> and responds 404 to every request.
+    # ------------------------------------------------------------------
+    proxy = py_files.get('proxy_server.py', '')
+    if "'host'" not in proxy.lower():
+        errors.append(
+            'proxy_server.py: does not strip the Host header before forwarding. '
+            'Upstream Kobiton routes by Host and returns 404 for localhost. '
+            'Must filter hop-by-hop/routing headers (including Host) from the forwarded request'
+        )
+
+    # ------------------------------------------------------------------
     # 3. config.py: generated boolean capabilities must use Python
     #    True/False, not JavaScript true/false.
     #    Pattern: a dict-value position — '...': true or '...': false
