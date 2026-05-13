@@ -2,7 +2,7 @@ import time
 import base64
 import requests
 from appium import webdriver
-from appium.options import AppiumOptions
+from appium.options.android import UiAutomator2Options
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -51,7 +51,7 @@ class TestBase:
 
         print(f"Initialize Appium driver with desiredCaps: {desired_caps}")
         server_url = self._proxy.get_server_url() + '/wd/hub'
-        options = AppiumOptions.load_capabilities(desired_caps)
+        options = UiAutomator2Options().load_capabilities(desired_caps)
         self._driver = webdriver.Remote(server_url, options=options)
 
     def cleanup(self):
@@ -204,8 +204,12 @@ class TestBase:
                         'isBooked': False
                     }
                 )
-                if response.status_code == 200 and response.json().get('deviceListData', []):
-                    return
+                if response.status_code == 200:
+                    data = response.json() or {}
+                    device_keys = ('deviceListData', 'privateDevices', 'favoriteDevices',
+                                   'cloudDevices', 'itaTrialCloudDevices', 'virtualDevices')
+                    if any(data.get(k) for k in device_keys):
+                        return
             except Exception as e:
                 print(f"Error checking device availability: {e}")
             print(f"Device not available, retrying ({attempt + 1}/{Config.DEVICE_WAITING_MAX_TRY_TIMES})...")
