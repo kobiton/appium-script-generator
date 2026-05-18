@@ -325,10 +325,8 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
             lines.push(new Line(`self.send_keys_to_active_element(${keysVarName})`, -1))
           }
           else {
-            if (configurations.length === 1) {
-              const {value} = configurations[0]
-              lines.push(new Line(`${keysVarName} = ${this._getString(value)}`))
-            }
+            const value = configurations.length === 1 ? configurations[0].value : ''
+            lines.push(new Line(`${keysVarName} = ${this._getString(value)}`))
             lines.push(new Line(`self.send_keys_to_active_element(${keysVarName})`))
           }
         } break

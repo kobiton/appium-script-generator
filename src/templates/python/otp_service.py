@@ -61,7 +61,14 @@ class OtpService:
             raw = response.text.strip().strip('"')
             self.is_cleanup = False
             self.raw_phone_number = raw
-            parsed = phonenumbers.parse(raw, country_code)
+            # phonenumbers.parse expects an ISO region (e.g. 'US') as the
+            # default-region arg, not a calling code ('1'). Try E.164 self-
+            # identification first; on failure, translate calling code → region.
+            try:
+                parsed = phonenumbers.parse(raw, None)
+            except phonenumbers.NumberParseException:
+                region = phonenumbers.region_code_for_country_code(int(country_code))
+                parsed = phonenumbers.parse(raw, region)
             self.phone_number = str(parsed.national_number)
             print(f"Found an available phone number {raw} to receive OTP code")
             return raw
