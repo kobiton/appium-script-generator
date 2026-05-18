@@ -10,6 +10,11 @@ from constants import DEVICE_SOURCES
 # 15-minute timeout (matching Java)
 SOCKET_TIMEOUT_SECONDS = 15 * 60
 
+HOP_BY_HOP_HEADERS = frozenset({
+    'content-length', 'transfer-encoding', 'connection', 'keep-alive',
+    'proxy-connection', 'te', 'trailers', 'upgrade',
+})
+
 
 class ProxyHandler(BaseHTTPRequestHandler):
     server_instance = None
@@ -174,16 +179,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 response_body = response.content
 
             try:
-                # Send response back with status code, headers and body
-                self.send_response(response.status_code)
-
-                # Strip Content-Length header since response_body may have been modified
-                # The HTTP server will calculate the correct length
                 response_headers = {key: val for key, val in response.headers.items()
-                                  if key.lower() != 'content-length'}
+                                  if key.lower() not in HOP_BY_HOP_HEADERS}
 
+                self.send_response(response.status_code)
                 for key, val in response_headers.items():
                     self.send_header(key, val)
+                self.send_header('Content-Length', str(len(response_body)))
+                self.send_header('Connection', 'close')
                 self.end_headers()
                 self.wfile.write(response_body)
             except Exception as send_error:
