@@ -1,262 +1,228 @@
-import socket
-import threading
-import sys
 import json
+import socket
+import sys
+import threading
+from functools import partial
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import requests
-from config import Config
-from constants import DEVICE_SOURCES
+from urllib.parse import urlparse, urlunparse, urlencode, parse_qsl
 
-# 15-minute timeout (matching Java)
+import requests
+
+from config import Config
+from constants import DeviceSource
+
 SOCKET_TIMEOUT_SECONDS = 15 * 60
 
+# Set False to enforce upstream TLS cert validation. Default True so on-prem
+# standalone deployments with self-signed certs work out of the box.
+TRUST_ALL_CERTS = True
 
-class ProxyHandler(BaseHTTPRequestHandler):
-    server_instance = None
+if TRUST_ALL_CERTS:
+    # Avoid an InsecureRequestWarning per forwarded request when verify=False.
+    from urllib3.exceptions import InsecureRequestWarning
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-    def do_request(self, method, body=None):
-        force_w3c = False
+# JSON Wire Protocol status code -> W3C error string.
+_ERROR_CODES = {
+    6: "invalid session id",
+    7: "no such element",
+    8: "no such frame",
+    9: "unknown command",
+    10: "stale element reference",
+    11: "element not visible",
+    12: "invalid element state",
+    13: "unknown error",
+    15: "element not selectable",
+    17: "javascript error",
+    19: "invalid selector",
+    21: "timeout",
+    23: "no such window",
+    24: "invalid cookie domain",
+    25: "unable to set cookie",
+    26: "unexpected alert open",
+    27: "no such alert",
+    28: "script timeout",
+    29: "invalid element coordinates",
+    30: "ime not available",
+    31: "ime engine activation failed",
+    32: "invalid selector",
+    33: "session not created",
+    34: "move target out of bounds",
+}
 
-        base_url = Config.get_appium_server_url_with_auth()
-        print(f"[PROXY] Base URL from config: {base_url}", file=sys.stderr, flush=True)
 
-        # Strip /wd/hub from self.path if present
-        path = self.path
-        if path.startswith('/wd/hub'):
-            path = path[len('/wd/hub'):]
+def _is_status_code_success(status_code):
+    return 200 <= status_code <= 299
 
-        print(f"[PROXY] Incoming path: {self.path}", file=sys.stderr, flush=True)
-        print(f"[PROXY] Stripped path: {path}", file=sys.stderr, flush=True)
 
-        url = f"{base_url.rstrip('/')}{path}"
-        print(f"[PROXY] Final URL being called: {url}", file=sys.stderr, flush=True)
+class _ProxyHandler(BaseHTTPRequestHandler):
+    """Per-connection HTTP handler. Delegates each request to ProxyServer.serve()."""
 
-        # Get current_command_id from server instance
-        current_command_id = self.server_instance.current_command_id if self.server_instance else 0
-        if Config.DEVICE_SOURCE == DEVICE_SOURCES['KOBITON'] and current_command_id > 0:
-            separator = '&' if '?' in url else '?'
-            url = f"{url}{separator}baseCommandId={current_command_id}"
-            print(f"[PROXY] URL with baseCommandId: {url}", file=sys.stderr, flush=True)
+    def __init__(self, server_instance, *args, **kwargs):
+        # `server_instance` is bound via functools.partial when the HTTPServer
+        # is constructed, so each ProxyServer keeps its own state. No class
+        # attributes -- concurrent ProxyServer instances stay isolated.
+        self._proxy = server_instance
+        super().__init__(*args, **kwargs)
 
-        headers = {key: val for key, val in self.headers.items()}
-        # Remove Host header to avoid conflicts
-        headers.pop('Host', None)
-
-        # Add Authorization header (matching Java approach)
-        headers['Authorization'] = Config.get_basic_auth_string()
-
-        # Log the Authorization header
-        auth_header = headers.get('Authorization', 'NOT SET')
-        masked_auth = "Basic ***" if auth_header.startswith("Basic ") else (auth_header if auth_header == "NOT SET" else "***")
-        print(f"[PROXY] Authorization header: {masked_auth}", file=sys.stderr, flush=True)
-        print(f"[PROXY] All request headers: {headers}", file=sys.stderr, flush=True)
-
+    def _serve(self, method):
         try:
-            print(f"[PROXY] Making {method} request to: {url}", file=sys.stderr, flush=True)
-
-            # Make the request using requests library with timeout (matching Java 15 min timeout)
-            if method == 'GET':
-                response = requests.get(url, headers=headers, verify=False, timeout=SOCKET_TIMEOUT_SECONDS)
-            elif method == 'POST':
-                response = requests.post(url, data=body, headers=headers, verify=False, timeout=SOCKET_TIMEOUT_SECONDS)
-            elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, verify=False, timeout=SOCKET_TIMEOUT_SECONDS)
-            else:
-                response = requests.request(method, url, data=body, headers=headers, verify=False, timeout=SOCKET_TIMEOUT_SECONDS)
-
-            print(f"[PROXY] Response status code: {response.status_code} ({response.reason})", file=sys.stderr, flush=True)
-            print(f"[PROXY] Response headers: {dict(response.headers)}", file=sys.stderr, flush=True)
-            if len(response.content) < 500:
-                print(f"[PROXY] Response body: {response.content}", file=sys.stderr, flush=True)
-
-            # Process response
-            response_body = response.content
-
-            try:
-                # Handle /session POST response - extract kobitonSessionId and convert format if needed
-                if path == "/session" and method == "POST":
-                    response_json = json.loads(response.content.decode('utf-8'))
-
-                    # Extract kobitonSessionId if present
-                    if "value" in response_json and isinstance(response_json["value"], dict):
-                        if "kobitonSessionId" in response_json["value"]:
-                            kobiton_session_id = response_json["value"]["kobitonSessionId"]
-                            with self.server_instance._session_id_lock:
-                                self.server_instance.kobiton_session_id = kobiton_session_id
-                            print(f"[PROXY] Extracted kobitonSessionId: {kobiton_session_id}", file=sys.stderr, flush=True)
-
-                    # JSON Wire format conversion to W3C format
-                    # Check if response is in JSON Wire format (has 'status' and 'sessionId' at top level)
-                    if 200 <= response.status_code <= 299 and "status" in response_json and "sessionId" in response_json:
-                        print(f"[PROXY] Converting JSON Wire format to W3C format", file=sys.stderr, flush=True)
-                        force_w3c = True
-                        desired_caps = response_json.get("value", {})
-
-                        w3c_value = {
-                            "capabilities": desired_caps,
-                            "sessionId": response_json["sessionId"]
-                        }
-
-                        w3c_response = {
-                            "value": w3c_value
-                        }
-
-                        response_body = json.dumps(w3c_response).encode('utf-8')
-                        print(f"[PROXY] Converted response body: {response_body}", file=sys.stderr, flush=True)
-
-                # Handle error responses - convert JSON Wire error format to W3C if needed
-                if response.status_code >= 400 and force_w3c:
-                    try:
-                        error_json = json.loads(response.content.decode('utf-8'))
-
-                        # Check if this is a JSON Wire error format with 'status' field
-                        if "status" in error_json and "value" in error_json:
-                            print(f"[PROXY] Converting JSON Wire error format to W3C format", file=sys.stderr, flush=True)
-
-                            appium_status = error_json.get("status", 0)
-                            error_message = error_json.get("value", {}).get("message", "Unknown error")
-
-                            # Map Appium error codes to W3C error types
-                            error_code_map = {
-                                0: "success",
-                                1: "invalid_session_id",
-                                2: "no_such_element",
-                                3: "no_such_frame",
-                                4: "unknown_command",
-                                5: "stale_element_reference",
-                                6: "element_not_visible",
-                                7: "invalid_element_state",
-                                8: "unknown_error",
-                                9: "element_not_selectable",
-                                10: "javascript_error",
-                                11: "xpath_lookup_error",
-                                12: "timeout",
-                                13: "no_such_window",
-                                14: "invalid_cookie_domain",
-                                15: "unable_to_set_cookie",
-                                16: "unexpected_alert_open",
-                                17: "no_alert_open",
-                                18: "script_timeout",
-                                19: "invalid_element_coordinates",
-                                20: "ime_not_available",
-                                21: "ime_engine_activation_failed",
-                                22: "invalid_selector",
-                                23: "session_not_created",
-                                24: "move_target_out_of_bounds",
-                                25: "invalid_xpath_selector",
-                                26: "invalid_xpath_selector_return_typo",
-                                27: "element_not_interactable",
-                                28: "invalid_argument",
-                                29: "invalid_coordinates",
-                                30: "invalid_session_id",
-                                31: "javascript_error"
-                            }
-
-                            error_type = error_code_map.get(appium_status, "unknown_error")
-
-                            w3c_error = {
-                                "value": {
-                                    "error": error_type,
-                                    "message": error_message
-                                }
-                            }
-
-                            response_body = json.dumps(w3c_error).encode('utf-8')
-                            print(f"[PROXY] Converted error response body: {response_body}", file=sys.stderr, flush=True)
-                    except (json.JSONDecodeError, KeyError) as e:
-                        print(f"[PROXY] Could not convert error response format: {e}", file=sys.stderr, flush=True)
-                        # Use original response body if conversion fails
-                        pass
-
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"[PROXY] Could not parse/convert response body: {e}", file=sys.stderr, flush=True)
-                # Use original response body if parsing fails
-                response_body = response.content
-
-            try:
-                # Send response back with status code, headers and body
-                self.send_response(response.status_code)
-
-                # Strip Content-Length header since response_body may have been modified
-                # The HTTP server will calculate the correct length
-                response_headers = {key: val for key, val in response.headers.items()
-                                  if key.lower() != 'content-length'}
-
-                for key, val in response_headers.items():
-                    self.send_header(key, val)
-                self.end_headers()
-                self.wfile.write(response_body)
-            except Exception as send_error:
-                print(f"[PROXY] Error sending response: {type(send_error).__name__}: {str(send_error)}", file=sys.stderr, flush=True)
-                try:
-                    self.send_error(502, "Failed to send response")
-                except Exception:
-                    pass
+            length = int(self.headers.get('Content-Length', 0) or 0)
+            body = self.rfile.read(length) if length > 0 else None
+            status, payload, content_type = self._proxy.serve(self.path, method, body)
+            self.send_response(status)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
         except Exception as e:
-            print(f"[PROXY] Error forwarding {method} request to {url}: {type(e).__name__}: {str(e)}", file=sys.stderr, flush=True)
             import traceback
             traceback.print_exc(file=sys.stderr)
-            self.send_error(502, str(e))
+            try:
+                payload = json.dumps({'value': {'error': 'unknown error', 'message': str(e)}}).encode('utf-8')
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            except Exception:
+                pass
 
-    def do_GET(self):
-        self.do_request('GET')
-
-    def do_POST(self):
-        length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length) if length else None
-        self.do_request('POST', body)
-
-    def do_PUT(self):
-        length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length) if length else None
-        self.do_request('PUT', body)
-
-    def do_PATCH(self):
-        length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(length) if length else None
-        self.do_request('PATCH', body)
-
-    def do_DELETE(self):
-        self.do_request('DELETE')
+    def do_GET(self):    self._serve('GET')
+    def do_POST(self):   self._serve('POST')
+    def do_PUT(self):    self._serve('PUT')
+    def do_PATCH(self):  self._serve('PATCH')
+    def do_DELETE(self): self._serve('DELETE')
 
     def log_message(self, format, *args):
-        print(f"[PROXY] {format % args}", file=sys.stderr, flush=True)
+        # Suppress default access log.
+        pass
 
 
 class ProxyServer:
+    """Forwards Appium requests to the upstream Kobiton server.
+
+    Attaches Basic auth, optionally appends baseCommandId, and rewrites the
+    /session response + subsequent error responses from JSON-Wire to W3C
+    format when needed.
+
+    Only the Authorization header is forwarded -- we do NOT copy client
+    headers (no 'host', no cookies, no anything else); the upstream URL alone
+    determines routing.
+    """
+
     def __init__(self):
         self.current_command_id = 0
-        self.kobiton_session_id = None
+        self.kobiton_session_id = 0
         self._session_id_lock = threading.Lock()
-        self._server = None
-        self._port = 0
+        self._auth_string = Config.get_basic_auth_string()
+        self._force_w3c = False
+        self._http = requests.Session()
+        self._port = self._find_available_port()
+        self._server = HTTPServer(
+            ('localhost', self._port),
+            partial(_ProxyHandler, self),
+        )
         self._thread = None
 
     def start(self):
-        self._port = self._find_available_port()
-        self._server = HTTPServer(('localhost', self._port), ProxyHandler)
-        ProxyHandler.server_instance = self
-        print(f"[PROXY] Proxy server started on port {self._port}", file=sys.stderr, flush=True)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
 
     def stop(self):
         if self._server:
-            print(f"[PROXY] Stopping proxy server", file=sys.stderr, flush=True)
             self._server.shutdown()
+
+    def is_alive(self):
+        return self._thread is not None and self._thread.is_alive()
 
     def get_server_url(self):
         return f"http://localhost:{self._port}"
-
-    def get_kobiton_session_id(self):
-        with self._session_id_lock:
-            return self.kobiton_session_id if self.kobiton_session_id else 0
 
     @property
     def listening_port(self):
         return self._port
 
-    def _find_available_port(self):
+    def get_kobiton_session_id(self):
+        with self._session_id_lock:
+            return self.kobiton_session_id or 0
+
+    # ------------------------------------------------------------------
+    # Per-request: build upstream request, execute, post-process body.
+    # ------------------------------------------------------------------
+
+    def serve(self, request_uri, method, request_body):
+        url, path = self._build_appium_url(request_uri)
+        headers = {'Authorization': self._auth_string}
+        # Appium upstream rejects bodied requests without a content type
+        # ("desiredCapabilities or capabilities is required"). Match Java's
+        # ProxyServer.java behavior and hard-code JSON for bodied methods.
+        if request_body:
+            headers['Content-Type'] = 'application/json'
+
+        response = self._http.request(
+            method, url,
+            headers=headers, data=request_body,
+            timeout=SOCKET_TIMEOUT_SECONDS,
+            verify=not TRUST_ALL_CERTS,
+        )
+        status_code = response.status_code
+        content_type = response.headers.get('Content-Type', 'application/json')
+        body_string = response.text
+
+        try:
+            if path == '/session' and method == 'POST' and _is_status_code_success(status_code):
+                body_json = json.loads(body_string)
+                value = body_json.get('value')
+                if isinstance(value, dict) and 'kobitonSessionId' in value:
+                    with self._session_id_lock:
+                        self.kobiton_session_id = int(value['kobitonSessionId'])
+
+                # JSON Wire format -> W3C
+                if 'status' in body_json and 'sessionId' in body_json:
+                    self._force_w3c = True
+                    w3c_body = {'value': {
+                        'capabilities': value if isinstance(value, dict) else {},
+                        'sessionId': body_json['sessionId'],
+                    }}
+                    body_string = json.dumps(w3c_body)
+
+            # Convert JSON Wire error response to W3C format for any endpoint
+            # once a JSON-Wire /session response has flipped _force_w3c.
+            if not _is_status_code_success(status_code) and self._force_w3c:
+                body_json = json.loads(body_string)
+                appium_error_code = int(body_json.get('status', 13))
+                error_state = _ERROR_CODES.get(appium_error_code, 'unknown error')
+                value = body_json.get('value')
+                if isinstance(value, dict):
+                    value['error'] = error_state
+                    body_string = json.dumps(body_json)
+        except Exception:
+            # On any parse/shape mismatch, fall through with the original
+            # upstream body.
+            pass
+
+        return status_code, body_string.encode('utf-8'), content_type
+
+    def _build_appium_url(self, request_uri):
+        path = request_uri
+        if path.startswith('/wd/hub'):
+            path = path[len('/wd/hub'):]
+
+        combined = f"{Config.get_appium_server_url_with_auth().rstrip('/')}{path}"
+        parsed = urlparse(combined)
+        if Config.DEVICE_SOURCE == DeviceSource.KOBITON and self.current_command_id > 0:
+            qs = parse_qsl(parsed.query, keep_blank_values=True)
+            qs.append(('baseCommandId', str(self.current_command_id)))
+            parsed = parsed._replace(query=urlencode(qs))
+            url = urlunparse(parsed)
+        else:
+            url = combined
+
+        return url, parsed.path
+
+    @staticmethod
+    def _find_available_port():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(('', 0))
             return s.getsockname()[1]

@@ -1,20 +1,20 @@
 from urllib.parse import urlparse
 import base64
-from constants import DEVICE_SOURCES
+from constants import DeviceSource
 
 
 class Config:
     API_USERNAME = '{{username}}'
-    API_KEY = 'your_api_key'
+    API_KEY = '{{your_api_key}}'
     APPIUM_SERVER_URL = '{{appiumServerUrl}}'
-    DEVICE_SOURCE = DEVICE_SOURCES['KOBITON']
+    DEVICE_SOURCE = DeviceSource.{{deviceSource}}
     IMPLICIT_WAIT_IN_MS = 10000
     DEVICE_WAITING_MAX_TRY_TIMES = 5
     DEVICE_WAITING_INTERVAL_IN_MS = 30000
-    NEW_COMMAND_TIMEOUT_IN_MS = 15 * 60 * 1000
     SEND_KEYS_DELAY_IN_MS = 1500
     IDLE_DELAY_IN_MS = 3000
     KOBITON_API_URL = '{{kobitonApiUrl}}'
+    {{kobitonCredential}}
 
     #{{desiredCaps}}
 
