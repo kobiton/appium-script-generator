@@ -339,8 +339,9 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
         case 'generateRandomPhoneNumber': {
           const {length} = action
+          const randomPhoneCall = `self.otp_service.get_random_phone_number(${length})`
           lines.push(new Line('self.clear_text_field(12)'))
-          lines.push(new Line(`self.send_keys_to_active_element(self.otp_service.get_random_phone_number(${length}))`))
+          lines.push(new Line(`self.send_keys_to_active_element(${randomPhoneCall})`))
         } break
 
         case 'findOtpPhoneNumber': {
@@ -350,17 +351,17 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           lines.push(new Line('self.send_keys_to_active_element(self.otp_service.phone_number)'))
         } break
 
-        case 'findOtpEmailAddress': {
+        case 'findOtpEmailAddress':
           lines.push(new Line('self.otp_service.find_otp_email_address()'))
           lines.push(new Line('self.clear_text_field(24)'))
           lines.push(new Line('self.send_keys_to_active_element(self.otp_service.email_address)'))
-        } break
+          break
 
-        case 'findOtpCode': {
+        case 'findOtpCode':
           lines.push(new Line('self.otp_service.find_otp_code()'))
           lines.push(new Line('self.clear_text_field(8)'))
           lines.push(new Line('self.send_keys_to_active_element(self.otp_service.otp_code)'))
-        } break
+          break
 
         case 'rotate': {
           const {orientation} = action
