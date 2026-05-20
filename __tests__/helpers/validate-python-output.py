@@ -24,11 +24,19 @@ def validate(zip_path):
     errors = []
 
     with zipfile.ZipFile(zip_path) as zf:
-        py_files = {
-            name: zf.read(name).decode('utf-8')
-            for name in zf.namelist()
-            if name.endswith('.py')
-        }
+        # `py_files` is keyed by basename so lookups work regardless of the
+        # project layout inside the zip (e.g. "<name>/manual/test_app.py"
+        # vs "test_app.py"). `py_paths` keeps the full path for syntax-error
+        # reporting.
+        py_files = {}
+        py_paths = {}
+        for name in zf.namelist():
+            if not name.endswith('.py'):
+                continue
+            src = zf.read(name).decode('utf-8')
+            basename = name.rsplit('/', 1)[-1]
+            py_files[basename] = src
+            py_paths[name] = src
 
     if not py_files:
         errors.append('zip contains no .py files')
@@ -38,7 +46,7 @@ def validate(zip_path):
     # 1. Syntax check — ast.parse catches IndentationError, SyntaxError,
     #    wrong boolean literals, and broken string literals.
     # ------------------------------------------------------------------
-    for name, src in sorted(py_files.items()):
+    for name, src in sorted(py_paths.items()):
         try:
             ast.parse(src)
         except SyntaxError as exc:
@@ -98,16 +106,23 @@ def validate(zip_path):
         )
 
     # ------------------------------------------------------------------
-    # 2d. proxy_server.py must strip the client Host header before
-    #     forwarding to Kobiton. Without this, the upstream sees
-    #     Host: localhost:<port> and responds 404 to every request.
+    # 2d. proxy_server.py must not forward the client Host header to
+    #     Kobiton. Without this, the upstream sees Host: localhost:<port>
+    #     and responds 404 to every request. Two acceptable patterns:
+    #       a) explicit strip of 'host' from a copied headers dict, OR
+    #       b) headers dict built from a whitelist (no bulk copy of
+    #          self.headers into the forwarded request).
     # ------------------------------------------------------------------
     proxy = py_files.get('proxy_server.py', '')
-    if "'host'" not in proxy.lower():
+    has_explicit_strip = "'host'" in proxy.lower()
+    bulk_copy_patterns = ('self.headers.items()', 'dict(self.headers)')
+    has_bulk_copy = any(p in proxy for p in bulk_copy_patterns)
+    if has_bulk_copy and not has_explicit_strip:
         errors.append(
-            'proxy_server.py: does not strip the Host header before forwarding. '
+            'proxy_server.py: bulk-copies client headers (incl. Host) without stripping. '
             'Upstream Kobiton routes by Host and returns 404 for localhost. '
-            'Must filter hop-by-hop/routing headers (including Host) from the forwarded request'
+            'Either strip "host" from the copied dict, or build the forwarded headers '
+            'dict from a whitelist'
         )
 
     # ------------------------------------------------------------------

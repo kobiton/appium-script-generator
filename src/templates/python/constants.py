@@ -1,18 +1,20 @@
-DEVICE_SOURCES = {
-    'KOBITON': 'KOBITON',
-    'OTHER': 'OTHER'
-}
+from enum import Enum
 
-PRESS_TYPES = {
-    'HOME': 'HOME',
-    'BACK': 'BACK',
-    'POWER': 'POWER',
-    'APP_SWITCH': 'APP_SWITCH',
-    'ENTER': 'ENTER',
-    'DELETE': 'DELETE'
-}
 
-ORIENTATIONS = {
-    'PORTRAIT': 'PORTRAIT',
-    'LANDSCAPE': 'LANDSCAPE'
-}
+class DeviceSource(Enum):
+    KOBITON = 'KOBITON'
+    OTHER = 'OTHER'
+
+
+class PressType(Enum):
+    HOME = 'HOME'
+    BACK = 'BACK'
+    POWER = 'POWER'
+    APP_SWITCH = 'APP_SWITCH'
+    ENTER = 'ENTER'
+    DELETE = 'DELETE'
+
+
+class Orientation(Enum):
+    PORTRAIT = 'PORTRAIT'
+    LANDSCAPE = 'LANDSCAPE'

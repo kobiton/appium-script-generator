@@ -70,7 +70,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     for (const device of devices) {
       const {id, name: deviceName} = device
-      const desiredCapsMethodName = this._getVarName({
+      const desiredCapsMethodName = snakeCase(this._getVarName({
         name: [
           deviceName,
           get(device, 'capabilities.platformName'),
@@ -80,7 +80,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         prefix: 'get',
         suffix: 'desired_capabilities',
         varNames: desiredCapsMethodNames
-      })
+      }))
 
       const desiredCapsOfThisDevice = desiredCapabilitiesOfDevices.find(
         (desiredCap) => desiredCap.deviceId === id)
@@ -129,7 +129,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
 
     for (const device of devices) {
       const {name: deviceName, capabilities: deviceCaps} = device
-      const desiredCapsMethodName = this._getVarName({
+      const desiredCapsMethodName = snakeCase(this._getVarName({
         name: [
           deviceName,
           get(device, 'capabilities.platformName'),
@@ -139,7 +139,7 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         prefix: 'get',
         suffix: 'desired_capabilities',
         varNames: desiredCapsMethodNames
-      })
+      }))
 
       const retinaScale = get(deviceCaps, 'resolution.scale') || 1
       const testFnName = snakeCase(
@@ -158,26 +158,16 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
         new Line(`def ${testFnName}():`),
         new Line(`"""${testDescription}"""`, 1),
         new Line('automation_helper = None'),
-        new Line('error = None'),
-        new Line(''),
         new Line('try:'),
         new Line('automation_helper = TestApp()', 1),
         new Line(`capabilities = ${capsCall}`),
         new Line('automation_helper.find_online_device(capabilities)'),
         new Line(`automation_helper.setup(capabilities, ${retinaScale})`),
         new Line('automation_helper.run()'),
-        new Line('except Exception as err:', -1),
-        new Line('import traceback', 1),
-        new Line('traceback.print_exc()'),
-        new Line('error = err'),
-        new Line('if automation_helper:'),
-        new Line('automation_helper.save_debug_resource()', 1),
-        new Line('finally:', -2),
+        new Line('finally:', -1),
         new Line('if automation_helper:', 1),
         new Line('automation_helper.cleanup()', 1),
-        new Line('', -1),
-        new Line('assert error is None, f"Test case has error: {error}"', -1),
-        new Line('', -1)
+        new Line('', -3)
       ])
     }
 
@@ -280,14 +270,21 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           )
         } break
 
+        case 'swipeByPoints': {
+          const {x1, y1, x2, y2, duration} = action
+          lines.push(
+            new Line(`self.swipe_by_point(${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800})`)
+          )
+        } break
+
         case 'press': {
           const {value} = action
           const count = action.count || 1
           if (count === 1) {
-            lines.push(new Line(`self.press_button('${value}')`))
+            lines.push(new Line(`self.press_button(PressType.${value})`))
           }
           else {
-            lines.push(new Line(`self.press_button_multiple('${value}', ${count})`))
+            lines.push(new Line(`self.press_button_multiple(PressType.${value}, ${count})`))
           }
         } break
 
@@ -296,13 +293,77 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
           lines.push(new Line(`self.send_keys_to_active_element(${this._getString(value)})`))
         } break
 
+        case 'sendKeysWithDDT': {
+          const {configurations} = action
+          const keysVarName = `keys${rawLocatorVarName}`
+
+          if (configurations.length > 1) {
+            lines.push(new Line(`${keysVarName} = None`))
+            configurations.forEach((configuration, index) => {
+              const {value, device} = configuration
+              const {deviceName, platformVersion} = device || {}
+              const isFirst = index === 0
+              const isLast = !device || index === configurations.length - 1
+              let header
+              if (isLast) {
+                header = 'else:'
+              }
+              else if (isFirst) {
+                // eslint-disable-next-line max-len
+                header = `if self._device_name == "${deviceName}" and self._platform_version == "${platformVersion}":`
+              }
+              else {
+                // eslint-disable-next-line max-len
+                header = `elif self._device_name == "${deviceName}" and self._platform_version == "${platformVersion}":`
+              }
+              // First branch: stay at current indent. Subsequent branches dedent
+              // back from the previous body level before printing elif/else.
+              lines.push(new Line(header, isFirst ? 0 : -1))
+              lines.push(new Line(`${keysVarName} = ${this._getString(value)}`, 1))
+            })
+            // Close the body indent before the trailing sendKeys call.
+            lines.push(new Line(`self.send_keys_to_active_element(${keysVarName})`, -1))
+          }
+          else {
+            const value = configurations.length === 1 ? configurations[0].value : ''
+            lines.push(new Line(`${keysVarName} = ${this._getString(value)}`))
+            lines.push(new Line(`self.send_keys_to_active_element(${keysVarName})`))
+          }
+        } break
+
         case 'idle':
           lines.push(new Line('self.idle()'))
           break
 
+        case 'generateRandomPhoneNumber': {
+          const {length} = action
+          const randomPhoneCall = `self.otp_service.get_random_phone_number(${length})`
+          lines.push(new Line('self.clear_text_field(12)'))
+          lines.push(new Line(`self.send_keys_to_active_element(${randomPhoneCall})`))
+        } break
+
+        case 'findOtpPhoneNumber': {
+          const {countryCode} = action
+          lines.push(new Line(`self.otp_service.find_otp_phone_number("${countryCode}")`))
+          lines.push(new Line('self.clear_text_field(12)'))
+          lines.push(new Line('self.send_keys_to_active_element(self.otp_service.phone_number)'))
+        } break
+
+        case 'findOtpEmailAddress':
+          lines.push(new Line('self.otp_service.find_otp_email_address()'))
+          lines.push(new Line('self.clear_text_field(24)'))
+          lines.push(new Line('self.send_keys_to_active_element(self.otp_service.email_address)'))
+          break
+
+        case 'findOtpCode':
+          lines.push(new Line('self.otp_service.find_otp_code()'))
+          lines.push(new Line('self.clear_text_field(8)'))
+          lines.push(new Line('self.send_keys_to_active_element(self.otp_service.otp_code)'))
+          break
+
         case 'rotate': {
           const {orientation} = action
-          lines.push(new Line(`self.rotate_screen('${orientation}')`))
+          lines.push(new Line(`self.rotate_screen(Orientation.${orientation})`))
         } break
 
         case 'setLocation': {
@@ -333,50 +394,89 @@ export default class PythonAppiumScriptGenerator extends BaseAppiumScriptGenerat
     workingDir
   }) {
     const templateDir = path.join(__dirname, '../templates/python')
-    const outputDir = path.join(workingDir, 'python')
+    const subDir = isManualSession ? 'manual' : 'revisit'
     const outputFile = path.join(workingDir, `${requestScript.name}.zip`)
+    const compressedDir = path.join(workingDir, testingFramework)
+    const outputProject = path.join(compressedDir, requestScript.name, subDir)
+    const outputResourcesDir = path.join(outputProject, 'resources')
 
-    await createDir(outputDir)
-    await ncpAsync(templateDir, outputDir)
+    await createDir(outputProject)
+    await createDir(outputResourcesDir)
+    await ncpAsync(templateDir, outputProject)
 
-    const kobitonApiUrl = new URL(serverInfo.apiUrl)
-    const appiumServerUrl = `${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub`
-
-    const configPath = path.join(outputDir, 'config.py')
+    const configPath = path.join(outputProject, 'config.py')
     let configContent = await readFile(configPath, 'utf8')
+    let appiumServerUrl
+
+    if (DEVICE_SOURCES.KOBITON === deviceSource) {
+      const kobitonApiUrl = new URL(serverInfo.apiUrl)
+      appiumServerUrl = `${kobitonApiUrl.protocol}//${kobitonApiUrl.host}/wd/hub`
+      configContent = configContent.replace('{{your_api_key}}', 'your_api_key')
+      configContent = configContent.replace('{{username}}', serverInfo.username || '')
+      configContent = configContent.replace('    {{kobitonCredential}}\n', '')
+    }
+    else {
+      const sauceLabs = get(serverInfo, 'sauceLabs')
+      if (!sauceLabs) {
+        throw new Error('This account is not integrated with SauceLabs')
+      }
+
+      const sauceLabsApiUrl = new URL(sauceLabs.url)
+      appiumServerUrl =
+        `${sauceLabsApiUrl.protocol}//ondemand.${sauceLabs.region}.` +
+        `${sauceLabsApiUrl.host}:443/wd/hub`
+
+      const additionalConfig = [
+        new Line(`KOBITON_USERNAME = '${serverInfo.username}'`),
+        new Line('KOBITON_API_KEY = \'your_kobiton_api_key\'')
+      ]
+      configContent = configContent.replace(
+        '    {{kobitonCredential}}',
+        this._buildPythonCode(additionalConfig, 1)
+      )
+      configContent = configContent.replace('{{username}}', sauceLabs.username || '')
+      configContent = configContent.replace('{{your_api_key}}', 'your_sauce_labs_api_key')
+    }
+
     const desiredCapsCode = this._buildPythonCode(desiredCapsMethodLines, 1)
     configContent = configContent.replace('    #{{desiredCaps}}', desiredCapsCode)
-    configContent = configContent.replace('{{username}}', serverInfo.username || '')
     configContent = configContent.replace('{{appiumServerUrl}}', appiumServerUrl)
     configContent = configContent.replace('{{kobitonApiUrl}}', serverInfo.apiUrl || '')
+    configContent = configContent.replace('{{deviceSource}}', deviceSource)
     await writeFile(configPath, configContent)
 
-    const testAppPath = path.join(outputDir, 'test_app.py')
+    const testAppPath = path.join(outputProject, 'test_app.py')
     let testAppContent = await readFile(testAppPath, 'utf8')
-    const testScriptCode = this._buildPythonCode(testScriptLines, 2)
+    const testScriptCode = this._buildPythonCode(testScriptLines, 3)
     testAppContent = testAppContent.replace(
-      '        {{testScript}}',
-      testScriptCode || '        pass'
+      '            {{testScript}}',
+      testScriptCode || '            pass'
     )
+    testAppContent = testAppContent.replace(/\{\{portalUrl\}\}/g, serverInfo.portalUrl || '')
     await writeFile(testAppPath, testAppContent)
 
-    const testSuitePath = path.join(outputDir, 'test_suite.py')
+    const testSuitePath = path.join(outputProject, 'test_suite.py')
     let testSuiteContent = await readFile(testSuitePath, 'utf8')
     const testCasesCode = this._buildPythonCode(testCaseLines, 0)
     testSuiteContent = testSuiteContent.replace('{{testCases}}', testCasesCode)
     await writeFile(testSuitePath, testSuiteContent)
 
-    const readmePath = path.join(outputDir, 'README.md')
+    const readmePath = path.join(outputProject, 'README.md')
     let readmeContent = await readFile(readmePath, 'utf8')
     readmeContent = readmeContent.replace(/\{\{portalUrl\}\}/g, serverInfo.portalUrl || '')
     readmeContent = readmeContent.replace(/\{\{manualSessionId\}\}/g, manualSessionId || '')
     await writeFile(readmePath, readmeContent)
 
+    await ncpAsync(
+      path.join(templateDir, '../resources/execute-script-on-web-element.js'),
+      path.join(outputResourcesDir, 'execute-script-on-web-element.js')
+    )
+
     for (const [filename, content] of Object.entries(resourceFiles)) {
-      await writeFile(path.join(outputDir, filename), content)
+      await writeFile(path.join(outputResourcesDir, filename), content)
     }
 
-    await compress([{source: outputDir, name: false, type: 'dir'}], outputFile)
+    await compress([{source: compressedDir, name: false, type: 'dir'}], outputFile)
 
     return outputFile
   }
