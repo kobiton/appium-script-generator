@@ -153,6 +153,16 @@ class ProxyServer:
 
     def serve(self, request_uri, method, request_body):
         url, path = self._build_appium_url(request_uri)
+
+        # KOB-53267: Appium-Python-Client 3.x sends `POST .../click` with body
+        # `{}`; Java's older client sends `{"id":"<eid>"}`. Kobiton's
+        # flex-correct matches baseline commands by the legacy click body
+        # shape, so Python's empty body breaks the match -- flex-correct
+        # can't replay the dropped intermediate commands (KOB-53091). Inject
+        # the element id from the URL so the wire shape matches Java's.
+        if method == 'POST' and path.endswith('/click') and '/element/' in path:
+            request_body = self._inject_click_element_id(path, request_body)
+
         headers = {'Authorization': self._auth_string}
         # Appium upstream rejects bodied requests without a content type
         # ("desiredCapabilities or capabilities is required"). Match Java's
@@ -226,3 +236,23 @@ class ProxyServer:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(('', 0))
             return s.getsockname()[1]
+
+    @staticmethod
+    def _inject_click_element_id(path, request_body):
+        # Path may be either /wd/hub/session/{sid}/element/{eid}/click or
+        # /session/{sid}/element/{eid}/click depending on whether upstream
+        # base URL included /wd/hub. Locate 'element' segment by name.
+        parts = path.split('/')
+        try:
+            eid = parts[parts.index('element') + 1]
+        except (ValueError, IndexError):
+            return request_body
+        try:
+            raw = request_body.decode('utf-8') if isinstance(request_body, (bytes, bytearray)) else (request_body or '')
+            body = json.loads(raw) if raw.strip() else {}
+        except Exception:
+            return request_body
+        if not (isinstance(body, dict) and not body):
+            return request_body
+        new_body = json.dumps({'id': eid})
+        return new_body.encode('utf-8') if isinstance(request_body, (bytes, bytearray)) or request_body is None else new_body
