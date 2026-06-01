@@ -886,6 +886,9 @@ namespace AppiumTest
             sequence.AddAction(finger.CreatePointerUp(MouseButton.Left));
 
             driver.PerformActions(new List<ActionSequence> { sequence });
+            // PerformActions() returns as soon as the gesture is dispatched, but the swipe animation
+            // is still running on screen. Wait for its full duration so the next action sees a stable screen.
+            sleep(durationInMs);
         }
 
         /**
@@ -897,6 +900,9 @@ namespace AppiumTest
             Log($"Swipe to top from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
 
             SwipeByPoint(fromPoint, toPoint, 100);
+            // A fast swipe triggers scroll inertia that keeps the content moving after the gesture ends.
+            // Wait for the screen to settle before interacting again.
+            sleep(Config.IdleDelayInMs);
         }
 
         /**
@@ -927,6 +933,9 @@ namespace AppiumTest
 
             Log($"Drag from point ({fromPoint.X}, {fromPoint.Y}) to point ({toPoint.X}, {toPoint.Y})");
             driver.PerformActions(new[] {sequence});
+            // PerformActions() returns once the gesture is dispatched; the drag animation still runs on screen.
+            // Wait for its full duration so the next action sees a stable screen.
+            sleep(duration);
         }
 
         public void SendKeys(string keys)
