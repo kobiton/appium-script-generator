@@ -732,12 +732,18 @@ export default class TestBase {
     ]
 
     await this._driver.actions(actions)
+    // actions() returns as soon as the gesture is dispatched, but the swipe animation
+    // is still running on screen. Wait for its full duration so the next action sees a stable screen.
+    await this.sleep(durationInMs)
   }
 
   async swipeToTop(fromPoint) {
     const toPoint = new Point(fromPoint.x, (await this.getScreenSize()).y - 10)
     console.log(`Swipe to top from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
     await this.swipeByPoint(fromPoint, toPoint, 100)
+    // A fast swipe triggers scroll inertia that keeps the content moving after the gesture ends.
+    // Wait for the screen to settle before interacting again.
+    await this.sleep(Config.IDLE_DELAY_IN_MS)
   }
 
   async dragByPoint(fromPoint, toPoint) {
@@ -775,6 +781,9 @@ export default class TestBase {
 
     console.log(`Drag from point (${fromPoint.x}, ${fromPoint.y}) to point (${toPoint.x}, ${toPoint.y})`)
     await this._driver.actions(actions)
+    // actions() returns once the gesture is dispatched; the drag animation still runs on screen.
+    // Wait for its full duration so the next action sees a stable screen.
+    await this.sleep(duration)
   }
 
   async dragFromPoint(fromPoint, relativeOffsetX, relativeOffsetY) {

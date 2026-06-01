@@ -497,6 +497,9 @@ class TestBase:
             f"point ({to_p['x']}, {to_p['y']}) with duration {duration}"
         )
         self._driver.swipe(from_p['x'], from_p['y'], to_p['x'], to_p['y'], duration)
+        # swipe() returns as soon as the gesture is dispatched, but the swipe animation
+        # is still running on screen. Wait for its full duration so the next action sees a stable screen.
+        self.sleep(duration)
 
     def swipe_from_point(self, from_point, relative_offset_x, relative_offset_y, duration_ms):
         screen = self.get_screen_size()
@@ -512,6 +515,9 @@ class TestBase:
             f"to point ({to_point['x']}, {to_point['y']})"
         )
         self._swipe(from_point, to_point, 100)
+        # A fast swipe triggers scroll inertia that keeps the content moving after the gesture ends.
+        # Wait for the screen to settle before interacting again.
+        self.sleep(Config.IDLE_DELAY_IN_MS)
 
     def drag_by_point(self, from_point, to_point):
         # Linear-velocity drag built as a single W3C pointer sequence so the
@@ -541,6 +547,9 @@ class TestBase:
             f"point ({to_point['x']}, {to_point['y']})"
         )
         actions.perform()
+        # perform() returns once the gesture is dispatched; the drag animation still runs on screen.
+        # Wait for its full duration so the next action sees a stable screen.
+        self.sleep(total_duration_ms)
 
     def drag_from_point(self, from_point, relative_offset_x, relative_offset_y):
         screen = self.get_screen_size()

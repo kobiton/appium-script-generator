@@ -757,6 +757,9 @@ public class TestBase {
         sequence.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
 
         driver.perform(Arrays.asList(sequence));
+        // perform() returns as soon as the gesture is dispatched, but the swipe animation
+        // is still running on screen. Wait for its full duration so the next action sees a stable screen.
+        sleep(durationInMs);
     }
 
     /**
@@ -767,6 +770,9 @@ public class TestBase {
         System.out.println(String.format("Swipe to top from point (%s, %s) to point (%s, %s)", fromPoint.x, fromPoint.y, toPoint.x, toPoint.y));
 
         swipeByPoint(fromPoint, toPoint, 100);
+        // A fast swipe triggers scroll inertia that keeps the content moving after the gesture ends.
+        // Wait for the screen to settle before interacting again.
+        sleep(Config.IDLE_DELAY_IN_MS);
     }
 
     /**
@@ -794,6 +800,9 @@ public class TestBase {
 
         System.out.println(String.format("Drag from point (%s, %s) to point (%s, %s)", fromPoint.x, fromPoint.y, toPoint.x, toPoint.y));
         driver.perform(Arrays.asList(sequence));
+        // perform() returns once the gesture is dispatched; the drag animation still runs on screen.
+        // Wait for its full duration so the next action sees a stable screen.
+        sleep(duration);
         return sequence;
     }
 
