@@ -1,5 +1,10 @@
 from urllib.parse import urlparse
 import base64
+import os
+
+import requests
+from urllib3.exceptions import InsecureRequestWarning
+
 from constants import DeviceSource
 
 
@@ -14,6 +19,9 @@ class Config:
     SEND_KEYS_DELAY_IN_MS = 1500
     IDLE_DELAY_IN_MS = 3000
     KOBITON_API_URL = '{{kobitonApiUrl}}'
+    # Run with KOBITON_TRUST_ALL_CERTS=true to skip TLS cert validation — needed
+    # for on-prem standalone deployments served over a self-signed certificate.
+    TRUST_ALL_CERTS = os.getenv('KOBITON_TRUST_ALL_CERTS', '').strip().lower() in ('1', 'true', 'yes')
     {{kobitonCredential}}
 
     #{{desiredCaps}}
@@ -29,3 +37,9 @@ class Config:
         credentials = f"{cls.API_USERNAME}:{cls.API_KEY}"
         encoded = base64.b64encode(credentials.encode()).decode()
         return f"Basic {encoded}"
+
+
+# Suppress the per-request InsecureRequestWarning emitted when TRUST_ALL_CERTS
+# disables verification across the proxy and the Kobiton REST calls.
+if Config.TRUST_ALL_CERTS:
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)

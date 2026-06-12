@@ -34,7 +34,7 @@ namespace AppiumTest
         public Point? screenSize;
         public double retinaScale;
         public string deviceName, platformVersion;
-        public HttpClient httpClient = new HttpClient();
+        public HttpClient httpClient = Config.CreateHttpClient();
         private string? currentContext;
         private string currentWindow;
 
@@ -1379,7 +1379,7 @@ namespace AppiumTest
         public string GetAppUrl(int appVersionId)
         {
             string appUrl = string.Empty;
-            using (HttpClient client = new HttpClient())
+            using (HttpClient client = Config.CreateHttpClient())
             {
                 client.DefaultRequestHeaders.Add("Content-Type", "application/json");
                 client.DefaultRequestHeaders.Add("Authorization", Config.GetBasicAuthString());
@@ -1495,7 +1495,7 @@ namespace AppiumTest
             };
             deviceListUriBuilder.Query = new FormUrlEncodedContent(query).ReadAsStringAsync().Result;
 
-            using (var httpClient = new HttpClient())
+            using (var httpClient = Config.CreateHttpClient())
             {
                 httpClient.DefaultRequestHeaders.Add(HttpRequestHeader.Authorization.ToString(),
                     Config.GetBasicAuthString());

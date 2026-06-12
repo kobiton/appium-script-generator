@@ -22,7 +22,7 @@ export default class Proxy {
       req.url = url.toString().replace(this.getServerUrl(), '')
       this._proxy.web(req, res, {
         target: Config.getAppiumServerUrlWithAuth().replace('/wd/hub', ''),
-        secure: false,
+        secure: !Config.TRUST_ALL_CERTS,
         changeOrigin: true
       })
     })

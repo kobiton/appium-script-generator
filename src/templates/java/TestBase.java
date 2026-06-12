@@ -59,7 +59,7 @@ public class TestBase {
     enum PRESS_TYPES {HOME, BACK, POWER, APP_SWITCH, ENTER, DELETE}
 
     public Gson gson = new GsonBuilder().disableHtmlEscaping().create();
-    public final OkHttpClient httpClient = new OkHttpClient();
+    public final OkHttpClient httpClient = Config.createHttpClientBuilder().build();
 
     private String currentContext;
     private String currentWindow;
@@ -1182,7 +1182,7 @@ public class TestBase {
 
     public String getAppUrl(int appVersionId) throws Exception {
         String appUrl = "";
-        OkHttpClient client = new OkHttpClient();
+        OkHttpClient client = Config.createHttpClientBuilder().build();
         Request request = new Request.Builder()
             .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
             .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")

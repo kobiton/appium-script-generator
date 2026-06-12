@@ -12,6 +12,9 @@ export const Config = {
   SEND_KEYS_DELAY_IN_MS: 1500,
   IDLE_DELAY_IN_MS: 3000,
   KOBITON_API_URL: '{{kobitonApiUrl}}',
+  // Run with KOBITON_TRUST_ALL_CERTS=true to skip TLS cert validation — needed
+  // for on-prem standalone deployments served over a self-signed certificate.
+  TRUST_ALL_CERTS: ['1', 'true', 'yes'].includes((process.env.KOBITON_TRUST_ALL_CERTS || '').trim().toLowerCase()),
 
   getAppiumServerUrlWithAuth() {
     const url = new URL(this.APPIUM_SERVER_URL)

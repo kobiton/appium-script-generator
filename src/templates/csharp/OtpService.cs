@@ -12,7 +12,7 @@ namespace AppiumTest
 
     public class OtpService
     {
-        private static readonly HttpClient httpClient = new HttpClient();
+        private static readonly HttpClient httpClient = Config.CreateHttpClient();
 
         public const int FindPhoneNumberMaxAttempts = 12;
         public const int FindPhoneNumberInternalInMs = 10000;

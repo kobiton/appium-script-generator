@@ -56,6 +56,12 @@ pytest test_suite.py -v -s
 Run `deactivate` when finished. On subsequent runs, only `source .venv/bin/activate`
 and `pytest test_suite.py -v -s` are needed.
 
+On a Kobiton Standalone server using a self-signed SSL certificate, skip TLS cert
+validation with `KOBITON_TRUST_ALL_CERTS=true`:
+
+- macOS/Linux: `KOBITON_TRUST_ALL_CERTS=true pytest test_suite.py -v -s`
+- Windows (PowerShell): `$env:KOBITON_TRUST_ALL_CERTS="true"; pytest test_suite.py -v -s`
+
 ## View the test results
 
 ### Run on Kobiton platform

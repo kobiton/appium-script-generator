@@ -52,6 +52,7 @@ class OtpService:
                 f"{Config.KOBITON_API_URL}/v1/otp/phone-numbers/available",
                 params={'countryCode': country_code},
                 headers={'Authorization': Config.get_basic_auth_string()},
+                verify=not Config.TRUST_ALL_CERTS,
             )
             if response.status_code in (401, 403):
                 raise _AbortRetry(Exception(response.text or f"HTTP {response.status_code}"))
@@ -87,6 +88,7 @@ class OtpService:
             response = requests.get(
                 f"{Config.KOBITON_API_URL}/v1/otp/email-address/available",
                 headers={'Authorization': Config.get_basic_auth_string()},
+                verify=not Config.TRUST_ALL_CERTS,
             )
             if response.status_code in (401, 403):
                 raise _AbortRetry(Exception(response.text or f"HTTP {response.status_code}"))
@@ -121,6 +123,7 @@ class OtpService:
             response = requests.get(
                 url, params=params,
                 headers={'Authorization': Config.get_basic_auth_string()},
+                verify=not Config.TRUST_ALL_CERTS,
             )
             if response.status_code in (401, 403):
                 raise _AbortRetry(Exception(response.text or f"HTTP {response.status_code}"))
@@ -160,6 +163,7 @@ class OtpService:
             requests.post(
                 url, params=params,
                 headers={'Authorization': Config.get_basic_auth_string()},
+                verify=not Config.TRUST_ALL_CERTS,
             )
             self.is_cleanup = True
         except Exception as e:

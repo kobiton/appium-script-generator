@@ -99,7 +99,7 @@ class TestBase:
             'Content-Type': 'application/json',
         }
         url = f"{Config.KOBITON_API_URL}/v1/app/versions/{app_version_id}/downloadUrl"
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, verify=not Config.TRUST_ALL_CERTS)
         response.raise_for_status()
         return response.json()['url']
 
@@ -704,6 +704,7 @@ class TestBase:
             f"{Config.KOBITON_API_URL}/v1/devices",
             params={k: v for k, v in params.items() if v is not None},
             headers={'Authorization': Config.get_basic_auth_string()},
+            verify=not Config.TRUST_ALL_CERTS,
         )
         if response.status_code != 200:
             raise Exception(response.text)

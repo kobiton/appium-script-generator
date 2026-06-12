@@ -23,7 +23,7 @@ public class ProxyServer extends NanoHTTPD {
     private final int socketTimeoutInSecond = 15 * 60;
     private boolean forceW3C = false;
 
-    private final OkHttpClient httpClient = new OkHttpClient.Builder()
+    private final OkHttpClient httpClient = Config.createHttpClientBuilder()
             .connectTimeout(socketTimeoutInSecond, TimeUnit.SECONDS)
             .writeTimeout(socketTimeoutInSecond, TimeUnit.SECONDS)
             .readTimeout(socketTimeoutInSecond, TimeUnit.SECONDS)
