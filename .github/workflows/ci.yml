@@ -1,52 +1,72 @@
 name: CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'info'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+      git-ref:
+        description: Git Ref (Optional)
+        required: false
+  push:
+    branches:
+      - master
+      - main
+      - '**-rc'
+      - production
+      - 'production-hotfix'
+      - 'v*'
   pull_request:
-    branches: [master]
-    types: [opened, synchronize, reopened]
+    branches:
+      - master
+      - main
 
 permissions:
-  checks: write
+  id-token: write        # This is required for requesting the JWT
+  contents: read         # This is required for actions/checkout
+  pull-requests: write   # Required by sonar workflow for PR decoration
 
 jobs:
-  run-lint:
-    runs-on: ubuntu-latest
+  lint-test:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Quality Assurance
+    uses: kobiton/deployment/.github/workflows/ci-lint-test.yaml@master
+    with:
+      node-version: '22.13.1'
+      sync-submodule: 'true'
+    secrets: inherit
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
+  build-push-image:
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Build and Push image to ECR
+    uses: kobiton/deployment/.github/workflows/ci.yaml@master
+    with:
+      git-ref: ${{ github.event.inputs.git-ref }}
+      repo-name: 'appium-script-generator'
+    secrets: inherit
 
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 20.10.0
+  # --- Feature-per-Release: Build, push, and deploy on PR ---
 
-      - name: Install dependencies
-        run: |
-          npm install -g yarn
-          yarn install --frozen-lockfile --non-interactive
+  detect-target-env:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: kobiton/deployment/.github/workflows/detect-target-env.yaml@master
+    secrets: inherit
 
-      - name: Lint
-        run: |
-          yarn lint
-
-  run-test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 20.10.0
-
-      - name: Install dependencies
-        run: |
-          npm install -g yarn
-          yarn install --frozen-lockfile --non-interactive
-
-      - name: Test
-        run: |
-          yarn test
+  build-push-image-pr:
+    needs: [lint-test, detect-target-env]
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Build and Push image to ECR (PR)
+    uses: kobiton/deployment/.github/workflows/ci.yaml@master
+    with:
+      repo-name: appium-script-generator
+      sync-submodule: 'true'
+      sandbox-env: ${{ needs.detect-target-env.outputs.environment }}
+      branch-name: ${{ github.head_ref }}
+    secrets: inherit

@@ -1,0 +1,33 @@
+name: SonarQube
+
+on:
+  workflow_dispatch:
+    inputs:
+      git-ref:
+        description: Git Ref (Optional)
+        required: false
+  schedule:
+    # Trigger at 09:30pm every Friday ICT
+    - cron: "30 2 * * 5"
+
+  push:
+    branches:
+      - 'master'
+      - 'main'
+
+  pull_request:
+    branches:
+      - 'master'
+      - 'main'
+
+jobs:
+  build:
+    if: github.event.repository.owner.login == 'kobiton'
+    name: Scans
+    uses: kobiton/deployment/.github/workflows/sonar.yaml@master
+    with:
+      repo-name: appium-script-generator
+      git-ref: ${{ github.event.inputs.git-ref }}
+      sonar-project-key: kobiton-appium-script-generator
+      node-version: '20.10.0'
+    secrets: inherit
