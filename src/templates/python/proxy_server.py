@@ -13,15 +13,6 @@ from constants import DeviceSource
 
 SOCKET_TIMEOUT_SECONDS = 15 * 60
 
-# Set False to enforce upstream TLS cert validation. Default True so on-prem
-# standalone deployments with self-signed certs work out of the box.
-TRUST_ALL_CERTS = True
-
-if TRUST_ALL_CERTS:
-    # Avoid an InsecureRequestWarning per forwarded request when verify=False.
-    from urllib3.exceptions import InsecureRequestWarning
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
 # JSON Wire Protocol status code -> W3C error string.
 _ERROR_CODES = {
     6: "invalid session id",
@@ -164,7 +155,7 @@ class ProxyServer:
             method, url,
             headers=headers, data=request_body,
             timeout=SOCKET_TIMEOUT_SECONDS,
-            verify=not TRUST_ALL_CERTS,
+            verify=not Config.TRUST_ALL_CERTS,
         )
         status_code = response.status_code
         content_type = response.headers.get('Content-Type', 'application/json')

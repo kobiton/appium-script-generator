@@ -59,7 +59,7 @@ namespace AppiumTest
 
             var url = new Uri(appiumServerUrl + urlString);
 
-            using (var client = new HttpClient())
+            using (var client = Config.CreateHttpClient())
             {
                 var httpRequest = new HttpRequestMessage
                 {

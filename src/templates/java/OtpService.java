@@ -20,7 +20,7 @@ public class OtpService {
     public static final int FIND_OTP_CODE_MAX_ATTEMPTS = 12;
     public static final int FIND_OTP_CODE_INTERVAL_IN_MS = 10000;
 
-    private final OkHttpClient httpClient = new OkHttpClient();
+    private final OkHttpClient httpClient = Config.createHttpClientBuilder().build();
 
     public String countryCode = "1";
     public String rawPhoneNumber;

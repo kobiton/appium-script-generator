@@ -1,6 +1,7 @@
 import BPromise from 'bluebird'
 import canvas from 'canvas'
 import axios from 'axios'
+import https from 'https'
 import path from 'path'
 import get from 'lodash/get'
 import flatten from 'lodash/flatten'
@@ -14,6 +15,12 @@ import Rectangle from './rectangle'
 import Point from './point'
 import {Config} from '../config'
 import {DEVICE_SOURCES, PRESS_TYPES} from './constants'
+
+// Skip TLS cert validation on the direct Kobiton REST calls when
+// KOBITON_TRUST_ALL_CERTS is set — needed for standalone self-signed certs.
+if (Config.TRUST_ALL_CERTS) {
+  axios.defaults.httpsAgent = new https.Agent({rejectUnauthorized: false})
+}
 
 const NATIVE_CONTEXT = 'NATIVE_APP'
 const PLATFORM_NAMES = {
