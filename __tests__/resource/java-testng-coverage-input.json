@@ -1,0 +1,384 @@
+{
+  "sentAt": {
+    "low": 1105187238,
+    "high": 395,
+    "unsigned": true
+  },
+  "serverInfo": {
+    "apiUrl": "https://api.kobiton.com",
+    "portalUrl": "https://portal.kobiton.com",
+    "username": "kobitonadmin+appiumScriptGen",
+    "apiKey": "your_api_key"
+  },
+  "isManualSession": false,
+  "manualSessionId": "606",
+  "devices": [
+    {
+      "id": 2001,
+      "name": "Galaxy S22",
+      "capabilities": {
+        "platformName": "Android",
+        "platformVersion": "16",
+        "resolution": {
+          "width": 1080,
+          "height": 2340,
+          "scale": 1
+        }
+      }
+    },
+    {
+      "id": 2002,
+      "name": "iPhone 15",
+      "capabilities": {
+        "platformName": "iOS",
+        "platformVersion": "18.1",
+        "resolution": {
+          "width": 1179,
+          "height": 2556,
+          "scale": 3
+        }
+      }
+    }
+  ],
+  "testSteps": [
+    {
+      "id": "18000",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"activateApp\", \"appPackage\": \"com.example.app\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18001",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"touchOnElement\", \"x\": \"0.5\", \"y\": \"0.5\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false,
+      "selectorConfigurations": [
+        {
+          "device": {
+            "deviceName": "Galaxy S22",
+            "platformVersion": "16"
+          },
+          "selectors": [
+            {
+              "type": "id",
+              "value": "com.example:id/login"
+            },
+            {
+              "type": "className",
+              "value": "android.widget.Button"
+            }
+          ]
+        },
+        {
+          "device": {
+            "deviceName": "iPhone 15",
+            "platformVersion": "18.1"
+          },
+          "selectors": [
+            {
+              "type": "accessibilityId",
+              "value": "Login"
+            },
+            {
+              "type": "name",
+              "value": "login \"primary\""
+            }
+          ]
+        },
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//*[@text='Login']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18002",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"touchOnScrollableParent\", \"x\": \"0.4\", \"y\": \"0.6\", \"elementInfo\": {\"scrollableElementXpath\": \"//android.widget.ScrollView\"}}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false,
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "xpath",
+              "value": "//*[@text='Settings']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18003",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"touchAtPoint\", \"x\": \"0.25\", \"y\": \"0.75\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18004",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"swipeFromElement\", \"x1\": \"0.5\", \"y1\": \"0.8\", \"x2\": \"0.5\", \"y2\": \"0.2\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false,
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "className",
+              "value": "android.widget.ListView"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18005",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"swipeByPoints\", \"x1\": \"0.5\", \"y1\": \"0.8\", \"x2\": \"0.5\", \"y2\": \"0.2\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18006",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"press\", \"value\": \"HOME\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18007",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"press\", \"value\": \"BACK\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18008",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"press\", \"value\": \"DELETE\", \"count\": 3}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18009",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"sendKeys\", \"value\": \"hello \\\"world\\\"\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18010",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"sendKeysWithDDT\", \"configurations\": [{\"device\": {\"deviceName\": \"Galaxy S22\", \"platformVersion\": \"16\"}, \"value\": \"android-user\"}, {\"device\": {\"deviceName\": \"iPhone 15\", \"platformVersion\": \"18.1\"}, \"value\": \"ios-user\"}, {\"value\": \"default-user\"}]}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false,
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "id",
+              "value": "com.example:id/user"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18011",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"rotate\", \"orientation\": \"LANDSCAPE\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18012",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"setLocation\", \"lat\": \"10.7769\", \"long\": \"106.7009\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18013",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"generateRandomPhoneNumber\", \"length\": 10}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18014",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"findOtpPhoneNumber\", \"countryCode\": \"US\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18015",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"findOtpEmailAddress\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18016",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"findOtpCode\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    },
+    {
+      "id": "18017",
+      "context": "WEB",
+      "actionJson": "{\"command\": \"touchOnElement\", \"x\": \"0.5\", \"y\": \"0.5\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false,
+      "selectorConfigurations": [
+        {
+          "selectors": [
+            {
+              "type": "css",
+              "value": "a[href='/docs']"
+            },
+            {
+              "type": "linkText",
+              "value": "Docs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18018",
+      "context": "NATIVE",
+      "actionJson": "{\"command\": \"press\", \"value\": \"ENTER\"}",
+      "findingElementTimeout": 5000,
+      "isOnKeyboard": false
+    }
+  ],
+  "appUnderTest": {
+    "id": "com.example.app"
+  },
+  "desiredCapabilitiesOfDevices": [
+    {
+      "deviceId": 2001,
+      "desiredCapabilities": [
+        {
+          "key": "sessionName",
+          "value": "Automation on Galaxy S22",
+          "type": "string"
+        },
+        {
+          "key": "deviceOrientation",
+          "value": "portrait",
+          "type": "string"
+        },
+        {
+          "key": "noReset",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "captureScreenshots",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "newCommandTimeout",
+          "value": "900",
+          "type": "int"
+        },
+        {
+          "key": "deviceGroup",
+          "value": "KOBITON",
+          "type": "string"
+        },
+        {
+          "key": "deviceName",
+          "value": "Galaxy S22",
+          "type": "string"
+        },
+        {
+          "key": "platformVersion",
+          "value": "16",
+          "type": "string"
+        },
+        {
+          "key": "platformName",
+          "value": "Android",
+          "type": "string"
+        },
+        {
+          "key": "kobiton:flexCorrect",
+          "value": "true",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "deviceId": 2002,
+      "desiredCapabilities": [
+        {
+          "key": "sessionName",
+          "value": "Automation on iPhone 15",
+          "type": "string"
+        },
+        {
+          "key": "deviceOrientation",
+          "value": "portrait",
+          "type": "string"
+        },
+        {
+          "key": "noReset",
+          "value": "false",
+          "type": "bool"
+        },
+        {
+          "key": "captureScreenshots",
+          "value": "true",
+          "type": "bool"
+        },
+        {
+          "key": "newCommandTimeout",
+          "value": "900",
+          "type": "int"
+        },
+        {
+          "key": "deviceGroup",
+          "value": "KOBITON",
+          "type": "string"
+        },
+        {
+          "key": "deviceName",
+          "value": "iPhone 15",
+          "type": "string"
+        },
+        {
+          "key": "platformVersion",
+          "value": "18.1",
+          "type": "string"
+        },
+        {
+          "key": "platformName",
+          "value": "iOS",
+          "type": "string"
+        },
+        {
+          "key": "kobiton:flexCorrect",
+          "value": "true",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "requestScript": {
+    "name": "kobiton-appium-script-s606-java-testng-coverage",
+    "language": "java",
+    "testingFramework": "testng"
+  }
+}

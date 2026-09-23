@@ -1,32 +1,31 @@
 package com.kobiton.scriptlessautomation;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
+import io.appium.java_client.AppiumClientConfig;
 import io.appium.java_client.AppiumDriver;
-import io.appium.java_client.MobileElement;
+import io.appium.java_client.HidesKeyboard;
+import io.appium.java_client.InteractsWithApps;
+import io.appium.java_client.Location;
 import io.appium.java_client.Setting;
 import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.android.nativekey.AndroidKey;
 import io.appium.java_client.android.nativekey.KeyEvent;
 import io.appium.java_client.ios.IOSDriver;
-import io.appium.java_client.remote.MobileCapabilityType;
 import io.appium.java_client.remote.MobilePlatform;
+import io.appium.java_client.remote.SupportsContextSwitching;
+import io.appium.java_client.remote.SupportsLocation;
+import io.appium.java_client.remote.SupportsRotation;
 import okhttp3.*;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.utils.URIBuilder;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.*;
-import org.openqa.selenium.html5.Location;
 import org.openqa.selenium.interactions.KeyInput;
 import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
@@ -39,13 +38,14 @@ import java.lang.reflect.Type;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class TestBase {
-    public AppiumDriver<MobileElement> driver;
+    public AppiumDriver driver;
     public ProxyServer proxy;
     public OtpService otpService = new OtpService();
     public DesiredCapabilities desiredCaps;
@@ -55,6 +55,9 @@ public class TestBase {
     public String deviceName, platformVersion;
 
     public static String NATIVE_CONTEXT = "NATIVE_APP";
+    public static final String PLATFORM_NAME = "platformName";
+    public static final String DEVICE_NAME = "deviceName";
+    public static final String PLATFORM_VERSION = "platformVersion";
 
     enum PRESS_TYPES {HOME, BACK, POWER, APP_SWITCH, ENTER, DELETE}
 
@@ -67,19 +70,33 @@ public class TestBase {
     public void setup(DesiredCapabilities desiredCaps, double retinaScale) throws Exception {
         this.desiredCaps = desiredCaps;
         this.retinaScale = retinaScale;
-        this.isIos = MobilePlatform.IOS.equalsIgnoreCase(
-            (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_NAME));
-        this.deviceName = (String) desiredCaps.getCapability(MobileCapabilityType.DEVICE_NAME);
-        this.platformVersion = (String) desiredCaps.getCapability(MobileCapabilityType.PLATFORM_VERSION);
+        this.isIos = MobilePlatform.IOS.equalsIgnoreCase(getPlatformName(desiredCaps));
+        this.deviceName = (String) desiredCaps.getCapability(DEVICE_NAME);
+        this.platformVersion = (String) desiredCaps.getCapability(PLATFORM_VERSION);
 
         this.proxy = new ProxyServer();
 
-        URL appiumServerUrl = getAppiumServerUrl();
+        // Session creation can take minutes while a device is allocated and the app installed
+        AppiumClientConfig clientConfig = AppiumClientConfig.defaultConfig()
+            .baseUrl(getAppiumServerUrl())
+            .readTimeout(Duration.ofSeconds(ProxyServer.socketTimeoutInSecond));
         if (isIos) {
-            driver = new IOSDriver<>(appiumServerUrl, desiredCaps);
+            driver = new IOSDriver(clientConfig, desiredCaps);
         } else {
-            driver = new AndroidDriver<>(appiumServerUrl, desiredCaps);
+            driver = new AndroidDriver(clientConfig, desiredCaps);
         }
+    }
+
+    /**
+     * Selenium 4 stores platformName as a Platform enum, so read it back as the recorded label
+     */
+    public static String getPlatformName(Capabilities capabilities) {
+        Object platformName = capabilities.getCapability(PLATFORM_NAME);
+        if (platformName instanceof Platform) {
+            return ((Platform) platformName).is(Platform.IOS) ? MobilePlatform.IOS : MobilePlatform.ANDROID;
+        }
+
+        return platformName == null ? null : platformName.toString();
     }
 
     public void cleanup() {
@@ -98,7 +115,7 @@ public class TestBase {
 
     public String updateCurrentContext() {
         String previousContext = currentContext;
-        currentContext = driver.getContext();
+        currentContext = getContextDriver().getContext();
         if (!Objects.equals(previousContext, currentContext)) {
             System.out.println(String.format("Context is changed from %s to %s", previousContext, currentContext));
         }
@@ -113,7 +130,7 @@ public class TestBase {
     public void switchContext(String context) {
         if (context.equals(currentContext)) return;
         System.out.println(String.format("Switch to %s context", context));
-        driver.context(context);
+        getContextDriver().context(context);
         currentContext = context;
     }
 
@@ -205,7 +222,7 @@ public class TestBase {
 
     private List<ContextInfo> collectWebContextsInfo(List<String> nativeTexts) {
         List<ContextInfo> contextInfos = new ArrayList<>();
-        Set<String> contexts = driver.getContextHandles();
+        Set<String> contexts = getContextDriver().getContextHandles();
         boolean hasWebContext = contexts.stream().anyMatch(context -> !NATIVE_CONTEXT.equals(context));
         if (!hasWebContext) {
             System.out.println("No web context is available, contexts: " + String.join(", ", contexts));
@@ -261,18 +278,22 @@ public class TestBase {
         }, 4, 10000);
     }
 
-    public Object executeScriptOnWebElement(MobileElement element, String command) throws Exception {
-        String script = IOUtils.toString(getResourceAsStream("execute-script-on-web-element.js"), StandardCharsets.UTF_8);
+    public Object executeScriptOnWebElement(WebElement element, String command) throws Exception {
+        String script;
+        try (InputStream inputStream = getResourceAsStream("execute-script-on-web-element.js")) {
+            script = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
         return driver.executeScript(script, element, command);
     }
 
-    public void scrollToWebElement(MobileElement element) throws Exception {
+    public void scrollToWebElement(WebElement element) throws Exception {
         System.out.println(String.format("Scroll to web element %s", element.getTagName()));
         executeScriptOnWebElement(element, "scrollIntoView");
         sleep(1000);
     }
 
-    public Rectangle getWebElementRect(MobileElement element) throws Exception {
+    public Rectangle getWebElementRect(WebElement element) throws Exception {
         String resultString = (String) executeScriptOnWebElement(element, "getBoundingClientRect");
         JsonObject resultJson = gson.fromJson(resultString, JsonObject.class);
         Rectangle rect = new Rectangle(
@@ -291,7 +312,7 @@ public class TestBase {
         switchToNativeContext();
 
         try {
-            MobileElement kobitonWebview = this.isIos
+            WebElement kobitonWebview = this.isIos
                 ? findSingleElementBy(By.xpath("//*[@label='__kobiton_webview__']"))
                 : findSingleElementBy(By.xpath("//*[@text='__kobiton_webview__']"));
             Rectangle kobitonWebviewRect = kobitonWebview.getRect();
@@ -301,9 +322,7 @@ public class TestBase {
                     webElementRect.height,
                     webElementRect.width
             );
-            cropRect(nativeRect, kobitonWebviewRect);
-            scaleRect(nativeRect, scale);
-            return nativeRect;
+            return scaleRect(cropRect(nativeRect, kobitonWebviewRect), scale);
         }
         catch (Exception e) {
             if (this.isIos) throw e;
@@ -339,7 +358,7 @@ public class TestBase {
                 windowSize.width
             );
 
-            MobileElement topToolbar = null;
+            WebElement topToolbar = null;
             if (this.isIos) {
                 try {
                     topToolbar = findSingleElementBy(By.xpath("//*[@name='TopBrowserBar' or @name='topBrowserBar' or @name='TopBrowserToolbar' or child::XCUIElementTypeButton[@name='URL']]"));
@@ -393,17 +412,15 @@ public class TestBase {
                 webElementRect.width
             );
 
-            cropRect(nativeRect, webviewRect);
-            scaleRect(nativeRect, scale);
-            return nativeRect;
+            return scaleRect(cropRect(nativeRect, webviewRect), scale);
         }
     }
 
-    private MobileElement findVisibleElementCore(int timeoutInMiliSeconds, By... locators) throws Exception {
-        List<MobileElement> foundElements = findElementsBy(null, timeoutInMiliSeconds, locators);
-        MobileElement foundVisibleElement = null;
+    private WebElement findVisibleElementCore(int timeoutInMiliSeconds, By... locators) throws Exception {
+        List<WebElement> foundElements = findElementsBy(null, timeoutInMiliSeconds, locators);
+        WebElement foundVisibleElement = null;
 
-        for (MobileElement element : foundElements) {
+        for (WebElement element : foundElements) {
             boolean visible;
 
             if (isNativeContext()) {
@@ -432,10 +449,10 @@ public class TestBase {
         return foundVisibleElement;
     }
 
-    public MobileElement findVisibleElement(int timeoutInMiliSeconds, By... locators) throws Exception{
-        return Utils.retry(new Utils.Task<MobileElement>() {
+    public WebElement findVisibleElement(int timeoutInMiliSeconds, By... locators) throws Exception{
+        return Utils.retry(new Utils.Task<WebElement>() {
             @Override
-            MobileElement exec(int attempt) throws Exception {
+            WebElement exec(int attempt) throws Exception {
                 System.out.println(String.format("Finding visible element %s attempt with locator: %s", Utils.convertToOrdinal(attempt), Utils.getLocatorText(locators)));
                 return findVisibleElementCore(timeoutInMiliSeconds, locators);
             }
@@ -450,7 +467,7 @@ public class TestBase {
         }, isNativeContext() ? 1 : 3, 3000);
     }
 
-    private MobileElement findSingleElementBy(By locator) throws Exception {
+    private WebElement findSingleElementBy(By locator) throws Exception {
         System.out.println("Find element by: " + locator);
 
         try {
@@ -461,7 +478,7 @@ public class TestBase {
         }
     }
 
-    private List<MobileElement> findElements(MobileElement rootElement, int timeoutInMiliSeconds, boolean multiple, By... locators) throws Exception {
+    private List<WebElement> findElements(WebElement rootElement, int timeoutInMiliSeconds, boolean multiple, By... locators) throws Exception {
         String locatorText = Utils.getLocatorText(locators);
         System.out.println(String.format("Find element by: %s", locatorText));
         String notFoundMessage = String.format("Cannot find element by: %s", locatorText);
@@ -469,14 +486,16 @@ public class TestBase {
         if (locators.length == 1) {
             setImplicitWaitInMiliSecond(timeoutInMiliSeconds);
 
-            List<MobileElement> elements = null;
-            if (rootElement == null) {
-                elements = driver.findElements(locators[0]);
-            } else {
-                elements = rootElement.findElements(locators[0]);
+            List<WebElement> elements = null;
+            try {
+                if (rootElement == null) {
+                    elements = driver.findElements(locators[0]);
+                } else {
+                    elements = rootElement.findElements(locators[0]);
+                }
+            } finally {
+                setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
             }
-
-            setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
 
             if (multiple && elements != null && !elements.isEmpty())
                 return elements;
@@ -486,36 +505,39 @@ public class TestBase {
             throw new Exception(notFoundMessage);
         } else {
             int waitInterval = 5;
-            return Utils.retry(new Utils.Task<List<MobileElement>>() {
+            return Utils.retry(new Utils.Task<List<WebElement>>() {
                 @Override
-                List<MobileElement> exec(int attempt) throws Exception {
+                List<WebElement> exec(int attempt) throws Exception {
                     setImplicitWaitInMiliSecond(0);
-                    List<MobileElement> elements = null;
-                    for (By locator : locators) {
-                        try {
-                            if (rootElement == null) {
-                                elements = driver.findElements(locator);
-                            } else {
-                                elements = rootElement.findElements(locator);
-                            }
+                    try {
+                        List<WebElement> elements = null;
+                        for (By locator : locators) {
+                            try {
+                                if (rootElement == null) {
+                                    elements = driver.findElements(locator);
+                                } else {
+                                    elements = rootElement.findElements(locator);
+                                }
 
-                            if (multiple && elements != null && !elements.isEmpty())
-                                return elements;
-                            else if (!multiple && elements != null && elements.size() == 1)
-                                return elements;
-                        } catch (Exception ignored) {
+                                if (multiple && elements != null && !elements.isEmpty())
+                                    return elements;
+                                else if (!multiple && elements != null && elements.size() == 1)
+                                    return elements;
+                            } catch (Exception ignored) {
+                            }
                         }
+                    } finally {
+                        setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
                     }
 
-                    setImplicitWaitInMiliSecond(Config.IMPLICIT_WAIT_IN_MS);
                     throw new Exception(notFoundMessage);
                 }
             }, timeoutInMiliSeconds / (waitInterval * 1000), waitInterval * 1000);
         }
     }
 
-    public MobileElement findElementBy(MobileElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
-        List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
+    public WebElement findElementBy(WebElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
+        List<WebElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
         // flex correct could switch context on the fly
         if (isFlexCorrectEnabled()) {
             updateCurrentContext();
@@ -524,16 +546,16 @@ public class TestBase {
         return foundElements.get(0);
     }
 
-    public MobileElement findElementBy(By... locators) throws Exception {
+    public WebElement findElementBy(By... locators) throws Exception {
         return findElementBy(null, Config.IMPLICIT_WAIT_IN_MS, locators);
     }
 
-    public MobileElement findElementBy(int timeoutInMiliSeconds, By... locators) throws Exception {
+    public WebElement findElementBy(int timeoutInMiliSeconds, By... locators) throws Exception {
         return findElementBy(null, Math.max(Config.IMPLICIT_WAIT_IN_MS, timeoutInMiliSeconds), locators);
     }
 
-    public List<MobileElement> findElementsBy(MobileElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
-        List<MobileElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
+    public List<WebElement> findElementsBy(WebElement rootElement, int timeoutInMiliSeconds, By... locators) throws Exception {
+        List<WebElement> foundElements = findElements(rootElement, timeoutInMiliSeconds, true, locators);
         // flex correct could switch context on the fly
         if (isFlexCorrectEnabled()) {
             updateCurrentContext();
@@ -542,26 +564,26 @@ public class TestBase {
         return foundElements;
     }
 
-    public List<MobileElement> findElementsBy(By... locators) throws Exception {
+    public List<WebElement> findElementsBy(By... locators) throws Exception {
         return findElementsBy(null, Config.IMPLICIT_WAIT_IN_MS, locators);
     }
 
     /**
      * Scroll to find best element on scrollable
      */
-    public MobileElement findVisibleElementOnScrollable(int timeoutInMiliSeconds, By... locators) throws Exception {
+    public WebElement findVisibleElementOnScrollable(int timeoutInMiliSeconds, By... locators) throws Exception {
         Type type = new TypeToken<Map<String, String>>() {
         }.getType();
         JsonReader reader = new JsonReader(new InputStreamReader(getResourceAsStream(getCurrentCommandId() + ".json")));
         Map<String, String> infoMap = gson.fromJson(reader, type);
         Point screenSize = getScreenSize();
 
-        MobileElement touchableElement = Utils.retry(new Utils.Task<MobileElement>() {
-            private MobileElement scrollableElement;
+        WebElement touchableElement = Utils.retry(new Utils.Task<WebElement>() {
+            private WebElement scrollableElement;
             private boolean swipedToTop = false;
 
             @Override
-            MobileElement exec(int attempt) throws Exception {
+            WebElement exec(int attempt) throws Exception {
                 System.out.println(String.format("Finding visible element on scrollable %s attempt with locator: %s", Utils.convertToOrdinal(attempt), Utils.getLocatorText(locators)));
                 return findVisibleElementCore(timeoutInMiliSeconds, locators);
             }
@@ -590,7 +612,7 @@ public class TestBase {
                     Rectangle rect = scrollableElement.getRect();
                     // Fix bug when scrollableElement is out of viewport
                     if (center.y > screenSize.y || rect.height < 0) {
-                        center.y = screenSize.y / 2;
+                        center = new Point(center.x, screenSize.y / 2);
                     }
 
                     Point toPoint = new Point(center.x, Math.max((int) (center.y - rect.height / 1.5), 0));
@@ -606,12 +628,12 @@ public class TestBase {
         return touchableElement;
     }
 
-    public boolean isButtonElement(MobileElement element) throws Exception {
+    public boolean isButtonElement(WebElement element) throws Exception {
         String tagName = element.getTagName();
         return tagName != null && tagName.contains("Button");
     }
 
-    public MobileElement findWebview() throws Exception {
+    public WebElement findWebview() throws Exception {
         return findSingleElementBy(By.xpath(getWebviewXpathSelector()));
     }
 
@@ -622,7 +644,7 @@ public class TestBase {
     /**
      * Touch at center of element (element need to be visible)
      */
-    public void touchAtCenterOfElement(MobileElement element) {
+    public void touchAtCenterOfElement(WebElement element) {
         System.out.println(String.format("Touch at center of element %s", element.getTagName()));
         Point center = getCenterOfElement(element);
         touchAtPoint(center);
@@ -631,7 +653,7 @@ public class TestBase {
     /**
      * Handle event touch element
      */
-    public void touchOnElement(MobileElement element, double relativePointX, double relativePointY) throws Exception {
+    public void touchOnElement(WebElement element, double relativePointX, double relativePointY) throws Exception {
         if (isButtonElement(element)) {
             clickElement(element);
         } else {
@@ -642,7 +664,7 @@ public class TestBase {
     /**
      * Click element (element need to be visible)
      */
-    public void clickElement(MobileElement element) {
+    public void clickElement(WebElement element) {
         System.out.println(String.format("Click on element with type: %s", element.getTagName()));
         element.click();
     }
@@ -650,7 +672,7 @@ public class TestBase {
     /**
      * Touch at relative point of element (element need to be visible)
      */
-    public void touchAtRelativePointOfElement(MobileElement element, double relativePointX, double relativePointY) throws Exception {
+    public void touchAtRelativePointOfElement(WebElement element, double relativePointX, double relativePointY) throws Exception {
         System.out.println(String.format("Touch on element %s at relative point (%s %s)", element.getTagName(), relativePointX, relativePointY));
         Rectangle nativeRect;
         if (isNativeContext()) {
@@ -688,7 +710,7 @@ public class TestBase {
         driver.perform(Arrays.asList(touchSequence));
     }
 
-    public void swipeOnElement(MobileElement element, double relativePointX1, double relativePointY1, double relativePointX2, double relativePointY2, int durationInMs) throws Exception {
+    public void swipeOnElement(WebElement element, double relativePointX1, double relativePointY1, double relativePointX2, double relativePointY2, int durationInMs) throws Exception {
         System.out.println(String.format("Swipe on element %s from relative point (%s %s) to relative point (%s %s)", element.getTagName(), relativePointX1, relativePointY1, relativePointX2, relativePointY2));
         Rectangle nativeRect;
         if (isNativeContext()) {
@@ -820,18 +842,13 @@ public class TestBase {
 
             driver.perform(Arrays.asList(sequence));
         } catch (Exception ignored) {
-            if (this.isIos) {
-                getIosDriver().getKeyboard().sendKeys(keys);
-            }
-            else {
-                getAndroidDriver().getKeyboard().sendKeys(keys);
-            }
+            driver.switchTo().activeElement().sendKeys(keys);
         }
 
         sleep(Config.SEND_KEYS_DELAY_IN_MS);
     }
 
-    public void sendKeys(MobileElement element, String keys) {
+    public void sendKeys(WebElement element, String keys) {
         System.out.println(String.format("Send keys '%s' on element %s", keys, element.getTagName()));
 
         element.sendKeys(keys);
@@ -850,7 +867,7 @@ public class TestBase {
                 if (isIos) {
                     boolean needPressHome = true;
                     try {
-                        IOSDriver<MobileElement> iosDriver = getIosDriver();
+                        IOSDriver iosDriver = getIosDriver();
                         // isDeviceLocked() and unlockDevice() could failed on some devices
                         if (iosDriver.isDeviceLocked()) {
                             iosDriver.unlockDevice();
@@ -862,7 +879,7 @@ public class TestBase {
                     }
 
                     if (needPressHome) {
-                        driver.executeScript("mobile: pressButton", ImmutableMap.of("name", "home"));
+                        driver.executeScript("mobile: pressButton", Map.of("name", "home"));
                     }
                 } else {
                     pressAndroidKey(AndroidKey.HOME);
@@ -878,7 +895,7 @@ public class TestBase {
 
             case POWER:
                 if (isIos) {
-                    IOSDriver<MobileElement> iosDriver = getIosDriver();
+                    IOSDriver iosDriver = getIosDriver();
                     if (iosDriver.isDeviceLocked()) {
                         iosDriver.unlockDevice();
                     } else {
@@ -945,19 +962,19 @@ public class TestBase {
 
     public void activateApp(String appPackage) {
         System.out.println(String.format("Activate app %s", appPackage));
-        driver.activateApp(appPackage);
+        ((InteractsWithApps) driver).activateApp(appPackage);
         sleep(Config.IDLE_DELAY_IN_MS);
     }
 
     public void rotateScreen(ScreenOrientation orientation) {
         System.out.println(String.format("Rotate screen to %s", orientation));
-        driver.rotate(orientation);
+        ((SupportsRotation) driver).rotate(orientation);
         sleep(Config.IDLE_DELAY_IN_MS);
     }
 
     public void setLocation(Location location) {
         System.out.println(String.format("Set location to %s", location));
-        driver.setLocation(location);
+        ((SupportsLocation) driver).setLocation(location);
         sleep(Config.IDLE_DELAY_IN_MS);
     }
 
@@ -970,13 +987,13 @@ public class TestBase {
             }
 
             System.out.println("Keyboard is shown, hide it");
-            driver.hideKeyboard();
+            ((HidesKeyboard) driver).hideKeyboard();
         } catch (Exception ignored) {
         }
     }
 
     public void setImplicitWaitInMiliSecond(int value) {
-        driver.manage().timeouts().implicitlyWait(value, TimeUnit.MILLISECONDS);
+        driver.manage().timeouts().implicitlyWait(Duration.ofMillis(value));
     }
 
     public void updateSettings() {
@@ -1004,7 +1021,7 @@ public class TestBase {
         if (!isIos) return new Point(0, 0);
 
         try {
-            MobileElement rootElement = findSingleElementBy(By.xpath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
+            WebElement rootElement = findSingleElementBy(By.xpath("//XCUIElementTypeApplication | //XCUIElementTypeOther"));
             Dimension rootElementSize = rootElement.getSize();
             Point screenSize = getScreenSize();
             double screenWidthScaled = screenSize.x / retinaScale;
@@ -1061,7 +1078,7 @@ public class TestBase {
         return getClass().getClassLoader().getResourceAsStream(path);
     }
 
-    public Point getCenterOfElement(MobileElement element) {
+    public Point getCenterOfElement(WebElement element) {
         Rectangle rect = element.getRect();
         return new Point(rect.x + rect.width / 2, rect.y + rect.height / 2);
     }
@@ -1088,12 +1105,16 @@ public class TestBase {
         return new Rectangle(x, y, height, width);
     }
 
-    public IOSDriver<MobileElement> getIosDriver() {
-        return (IOSDriver<MobileElement>) driver;
+    public SupportsContextSwitching getContextDriver() {
+        return (SupportsContextSwitching) driver;
     }
 
-    public AndroidDriver<MobileElement> getAndroidDriver() {
-        return (AndroidDriver<MobileElement>) driver;
+    public IOSDriver getIosDriver() {
+        return (IOSDriver) driver;
+    }
+
+    public AndroidDriver getAndroidDriver() {
+        return (AndroidDriver) driver;
     }
 
     public URL getAppiumServerUrl() throws MalformedURLException {
@@ -1105,17 +1126,18 @@ public class TestBase {
     }
 
     public Device getAvailableDevice(DesiredCapabilities capabilities) throws Exception {
-        URIBuilder deviceListUriBuilder = new URIBuilder(Config.KOBITON_API_URL + "/v1/devices");
-        deviceListUriBuilder.addParameter("isOnline", "true");
-        deviceListUriBuilder.addParameter("isBooked", "false");
-        deviceListUriBuilder.addParameter("deviceName", (String) capabilities.getCapability(MobileCapabilityType.DEVICE_NAME));
-        deviceListUriBuilder.addParameter("platformVersion", (String) capabilities.getCapability(MobileCapabilityType.PLATFORM_VERSION));
-        deviceListUriBuilder.addParameter("platformName", (String) capabilities.getCapability(MobileCapabilityType.PLATFORM_NAME));
-        deviceListUriBuilder.addParameter("deviceGroup", (String) capabilities.getCapability("deviceGroup"));
+        HttpUrl deviceListUrl = HttpUrl.get(Config.KOBITON_API_URL + "/v1/devices").newBuilder()
+            .addQueryParameter("isOnline", "true")
+            .addQueryParameter("isBooked", "false")
+            .addQueryParameter("deviceName", (String) capabilities.getCapability(DEVICE_NAME))
+            .addQueryParameter("platformVersion", (String) capabilities.getCapability(PLATFORM_VERSION))
+            .addQueryParameter("platformName", getPlatformName(capabilities))
+            .addQueryParameter("deviceGroup", (String) capabilities.getCapability("deviceGroup"))
+            .build();
 
         Request.Builder deviceListBuilder = new Request.Builder()
-            .url(deviceListUriBuilder.build().toURL())
-            .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+            .url(deviceListUrl)
+            .header("Authorization", Config.getBasicAuthString())
             .get();
 
         try (Response response = httpClient.newCall(deviceListBuilder.build()).execute()) {
@@ -1144,10 +1166,10 @@ public class TestBase {
 
         int tryTime = 1;
         Device device = null;
-        String deviceName = (String) capabilities.getCapability(MobileCapabilityType.DEVICE_NAME);
+        String deviceName = (String) capabilities.getCapability(DEVICE_NAME);
         String deviceGroup = (String) capabilities.getCapability("deviceGroup");
-        String platformVersion = (String) capabilities.getCapability(MobileCapabilityType.PLATFORM_VERSION);
-        String platformName = (String) capabilities.getCapability(MobileCapabilityType.PLATFORM_NAME);
+        String platformVersion = (String) capabilities.getCapability(PLATFORM_VERSION);
+        String platformName = getPlatformName(capabilities);
         while (tryTime <= Config.DEVICE_WAITING_MAX_TRY_TIMES) {
             System.out.println(String.format("Is device with capabilities: (deviceName: %s, deviceGroup: %s, platformName: %s, platformVersion: %s) online? Retrying at %s time",
                 deviceName,
@@ -1185,8 +1207,8 @@ public class TestBase {
         OkHttpClient client = Config.createHttpClientBuilder().build();
         Request request = new Request.Builder()
             .url(String.format("%s/v1/app/versions/%s/downloadUrl", Config.KOBITON_API_URL, appVersionId))
-            .addHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-            .addHeader(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+            .addHeader("Content-Type", "application/json")
+            .addHeader("Authorization", Config.getBasicAuthString())
             .build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -1198,33 +1220,38 @@ public class TestBase {
         return appUrl;
     }
 
-    public void cropRect(Rectangle rect, Rectangle boundRect) {
-        if (rect.x < boundRect.x) {
-            rect.x = boundRect.x;
-        } else if (rect.x > boundRect.x + boundRect.width) {
-            rect.x = boundRect.x + boundRect.width;
+    public Rectangle cropRect(Rectangle rect, Rectangle boundRect) {
+        int x = rect.x, y = rect.y, width = rect.width, height = rect.height;
+        if (x < boundRect.x) {
+            x = boundRect.x;
+        } else if (x > boundRect.x + boundRect.width) {
+            x = boundRect.x + boundRect.width;
         }
 
-        if (rect.y < boundRect.y) {
-            rect.y = boundRect.y;
-        } else if (rect.y > boundRect.y + boundRect.height) {
-            rect.y = boundRect.y + boundRect.height;
+        if (y < boundRect.y) {
+            y = boundRect.y;
+        } else if (y > boundRect.y + boundRect.height) {
+            y = boundRect.y + boundRect.height;
         }
 
-        if (rect.x + rect.width > boundRect.x + boundRect.width) {
-            rect.width = boundRect.x + boundRect.width - rect.x;
+        if (x + width > boundRect.x + boundRect.width) {
+            width = boundRect.x + boundRect.width - x;
         }
 
-        if (rect.y + rect.height > boundRect.y + boundRect.height) {
-            rect.height = boundRect.y + boundRect.height - rect.y;
+        if (y + height > boundRect.y + boundRect.height) {
+            height = boundRect.y + boundRect.height - y;
         }
+
+        return new Rectangle(x, y, height, width);
     }
 
-    public void scaleRect(Rectangle rect, double scale) {
-        rect.x = (int) (rect.x * scale);
-        rect.y = (int) (rect.y * scale);
-        rect.width = (int) (rect.width * scale);
-        rect.height = (int) (rect.height * scale);
+    public Rectangle scaleRect(Rectangle rect, double scale) {
+        return new Rectangle(
+            (int) (rect.x * scale),
+            (int) (rect.y * scale),
+            (int) (rect.height * scale),
+            (int) (rect.width * scale)
+        );
     }
 
     public void saveDebugResource() {
@@ -1238,10 +1265,10 @@ public class TestBase {
             debugDir.mkdirs();
 
             String source = driver.getPageSource();
-            FileUtils.writeStringToFile(new File(debugDir, "source.xml"), source, StandardCharsets.UTF_8);
+            Files.writeString(new File(debugDir, "source.xml").toPath(), source, StandardCharsets.UTF_8);
 
             File screenshotFile = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-            FileUtils.copyFile(screenshotFile, new File(debugDir, "screenshot.png"));
+            Files.copy(screenshotFile.toPath(), new File(debugDir, "screenshot.png").toPath(), StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
             e.printStackTrace();
         }
