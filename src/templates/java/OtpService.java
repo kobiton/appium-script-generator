@@ -5,12 +5,11 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.utils.URIBuilder;
 
 public class OtpService {
     public static final int FIND_PHONE_NUMBER_MAX_ATTEMPTS = 12;
@@ -37,12 +36,12 @@ public class OtpService {
         System.out.println("Finding an available phone number for OTP...");
 
         this.countryCode = countryCode;
-        URIBuilder uriBuilder = new URIBuilder(Config.KOBITON_API_URL + "/v1/otp/phone-numbers/available");
-        uriBuilder.addParameter("countryCode", countryCode);
+        HttpUrl.Builder uriBuilder = HttpUrl.get(Config.KOBITON_API_URL + "/v1/otp/phone-numbers/available").newBuilder();
+        uriBuilder.addQueryParameter("countryCode", countryCode);
 
         Request.Builder requestBuilder = new Request.Builder()
-                .url(uriBuilder.build().toURL())
-                .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+                .url(uriBuilder.build())
+                .header("Authorization", Config.getBasicAuthString())
                 .get();
 
         rawPhoneNumber = Utils.retry(new Utils.Task<String>() {
@@ -94,11 +93,11 @@ public class OtpService {
     public String findOtpEmailAddress() throws Exception {
         System.out.println("Finding an email address for OTP...");
 
-        URIBuilder uriBuilder = new URIBuilder(Config.KOBITON_API_URL + "/v1/otp/email-address/available");
+        HttpUrl.Builder uriBuilder = HttpUrl.get(Config.KOBITON_API_URL + "/v1/otp/email-address/available").newBuilder();
 
         Request.Builder requestBuilder = new Request.Builder()
-                .url(uriBuilder.build().toURL())
-                .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+                .url(uriBuilder.build())
+                .header("Authorization", Config.getBasicAuthString())
                 .get();
 
         emailAddress = Utils.retry(new Utils.Task<String>() {
@@ -142,19 +141,19 @@ public class OtpService {
             throw new Exception("Please find an available phone number or email address first");
         }
 
-        URIBuilder uriBuilder;
+        HttpUrl.Builder uriBuilder;
         if (rawPhoneNumber != null) {
             System.out.println(String.format("Find OTP code sent to phone number %s", rawPhoneNumber));
-            uriBuilder = new URIBuilder(Config.KOBITON_API_URL + String.format("/v1/otp/phone-numbers/%s/otp-code", rawPhoneNumber));
+            uriBuilder = HttpUrl.get(Config.KOBITON_API_URL + String.format("/v1/otp/phone-numbers/%s/otp-code", rawPhoneNumber)).newBuilder();
         } else {
             System.out.println(String.format("Find OTP code sent to email address %s", emailAddress));
-            uriBuilder = new URIBuilder(Config.KOBITON_API_URL + "/v1/otp/email-address/otp-code");
-            uriBuilder.addParameter("emailAddress", emailAddress);
+            uriBuilder = HttpUrl.get(Config.KOBITON_API_URL + "/v1/otp/email-address/otp-code").newBuilder();
+            uriBuilder.addQueryParameter("emailAddress", emailAddress);
         }
 
         Request.Builder requestBuilder = new Request.Builder()
-                .url(uriBuilder.build().toURL())
-                .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
+                .url(uriBuilder.build())
+                .header("Authorization", Config.getBasicAuthString())
                 .get();
 
         otpCode = Utils.retry(new Utils.Task<String>() {
@@ -210,18 +209,18 @@ public class OtpService {
         }
 
         try {
-            URIBuilder uriBuilder;
+            HttpUrl.Builder uriBuilder;
             if (rawPhoneNumber != null) {
-                uriBuilder = new URIBuilder(Config.KOBITON_API_URL + String.format("/v1/otp/phone-numbers/%s/unbook", rawPhoneNumber));
+                uriBuilder = HttpUrl.get(Config.KOBITON_API_URL + String.format("/v1/otp/phone-numbers/%s/unbook", rawPhoneNumber)).newBuilder();
             } else {
-                uriBuilder = new URIBuilder(Config.KOBITON_API_URL + "/v1/otp/email-address/unbook");
-                uriBuilder.addParameter("emailAddress", emailAddress);
+                uriBuilder = HttpUrl.get(Config.KOBITON_API_URL + "/v1/otp/email-address/unbook").newBuilder();
+                uriBuilder.addQueryParameter("emailAddress", emailAddress);
             }
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(uriBuilder.build().toURL())
-                    .header(HttpHeaders.AUTHORIZATION, Config.getBasicAuthString())
-                    .post(RequestBody.create(null, new byte[0]));
+                    .url(uriBuilder.build())
+                    .header("Authorization", Config.getBasicAuthString())
+                    .post(RequestBody.create(new byte[0], null));
 
 
 

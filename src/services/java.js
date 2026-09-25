@@ -321,7 +321,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           const {x, y} = action
           const elementVarName = `element${rawLocatorVarName}`
           // eslint-disable-next-line max-len
-          lines.push(new Line(`MobileElement ${elementVarName} = findVisibleElement(${findingElementTimeout}, ${locatorVarName});`))
+          lines.push(new Line(`WebElement ${elementVarName} = findVisibleElement(${findingElementTimeout}, ${locatorVarName});`))
           // eslint-disable-next-line max-len
           lines.push(new Line(`touchOnElement(${elementVarName}, ${x}, ${y});`))
         } break
@@ -333,7 +333,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           const elementVarName = `element${rawLocatorVarName}`
           // eslint-disable-next-line max-len
-          lines.push(new Line(`MobileElement ${elementVarName} = findVisibleElementOnScrollable(${findingElementTimeout}, ${locatorVarName});`))
+          lines.push(new Line(`WebElement ${elementVarName} = findVisibleElementOnScrollable(${findingElementTimeout}, ${locatorVarName});`))
           // eslint-disable-next-line max-len
           lines.push(new Line(`touchOnElement(${elementVarName}, ${x}, ${y});`))
         } break
@@ -349,14 +349,14 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
           !isOnKeyboard && lines.push(new Line('hideKeyboard();'))
           const elementVarName = `element${rawLocatorVarName}`
           // eslint-disable-next-line max-len
-          lines.push(new Line(`MobileElement ${elementVarName} = findVisibleElement(${findingElementTimeout}, ${locatorVarName});`))
+          lines.push(new Line(`WebElement ${elementVarName} = findVisibleElement(${findingElementTimeout}, ${locatorVarName});`))
           // eslint-disable-next-line max-len
-          lines.push(new Line(`swipeOnElement(${elementVarName}, ${x1}, ${y1}, ${x2}, ${y2}, ${duration});`))
+          lines.push(new Line(`swipeOnElement(${elementVarName}, ${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800});`))
         } break
 
         case 'swipeByPoints': {
           const {x1, y1, x2, y2, duration} = action
-          lines.push(new Line(`swipeByPoint(${x1}, ${y1}, ${x2}, ${y2}, ${duration});`))
+          lines.push(new Line(`swipeByPoint(${x1}, ${y1}, ${x2}, ${y2}, ${duration || 800});`))
         } break
 
         case 'press': {
@@ -418,7 +418,7 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
         case 'setLocation': {
           const {lat, long} = action
           // eslint-disable-next-line max-len
-          lines.push(new Line(`setLocation(new Location((long)Double.parseDouble("${lat}"), (long)Double.parseDouble("${long}"), 0.0));`))
+          lines.push(new Line(`setLocation(new Location(Double.parseDouble("${lat}"), Double.parseDouble("${long}"), 0.0));`))
         } break
 
         case 'generateRandomPhoneNumber': {
@@ -627,37 +627,38 @@ export default class JavaAppiumScriptGenerator extends BaseAppiumScriptGenerator
   _getLocatorCode({step, locatorVarName}) {
     const {selectorConfigurations} = step
     const getLocatorStatement = ({selector}) => {
-      let body
+      // Native strategies go through AppiumBy: Selenium 4 rewrites By.id/name/className
+      // to CSS selectors
+      let strategy
 
       switch (selector.type) {
         case 'accessibilityId':
-          body = 'AccessibilityId'
+          strategy = 'AppiumBy.accessibilityId'
           break
         case 'id':
-          body = 'id'
+          strategy = 'AppiumBy.id'
           break
         case 'name':
-          body = 'name'
+          strategy = 'AppiumBy.name'
           break
         case 'className':
-          body = 'className'
+          strategy = 'AppiumBy.className'
           break
         case 'linkText':
-          body = 'linkText'
+          strategy = 'By.linkText'
           break
         case 'css':
-          body = 'cssSelector'
+          strategy = 'By.cssSelector'
           break
         case 'xpath':
-          body = 'xpath'
+          strategy = 'By.xpath'
           break
         default:
           throw new Error(`Unsupported selector type: ${selector.type}`)
       }
 
       const selectorValue = selector.value.replace(/"/g, '\\"')
-      const suffix = `("${selectorValue}")`
-      return 'MobileBy.' + body + suffix
+      return `${strategy}("${selectorValue}")`
     }
 
     const lines = []
