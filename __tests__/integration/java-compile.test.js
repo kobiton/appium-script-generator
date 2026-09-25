@@ -14,6 +14,9 @@ const FIXTURES = [
 const REMOVED_APIS =
   /MobileElement|MobileBy|MobileCapabilityType|org\.openqa\.selenium\.html5|\bundefined\b/
 const REQUIRED = process.env.REQUIRE_JAVA_COMPILE === 'true'
+const SESSION_CHECK_SOURCE =
+  path.resolve(__dirname, '../resource/java/SessionCapabilitiesCheck.java')
+const SOURCE_PACKAGE_DIR = ['src', 'test', 'java', 'com', 'kobiton', 'scriptlessautomation']
 const TOOLCHAIN_READY = hasJavaToolchain()
 
 if (!TOOLCHAIN_READY && !REQUIRED) {
@@ -84,6 +87,29 @@ describe('JavaAppiumScriptGenerator compiled output', () => {
       }
       catch (err) {
         throw new Error('Maven compilation failed:\n' +
+          `${(err.stdout || '').trim()}\n${(err.stderr || '').trim()}`)
+      }
+    }, 600000)
+
+    it('builds session capabilities the Selenium client accepts', () => {
+      fs.copyFileSync(SESSION_CHECK_SOURCE,
+        path.join(projectDir, ...SOURCE_PACKAGE_DIR, 'SessionCapabilitiesCheck.java'))
+      const classpathFile = path.join(projectDir, 'classpath.txt')
+      const java = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin', 'java') : 'java'
+
+      try {
+        execFileSync('mvn', ['-q', '-B', 'test-compile', 'dependency:build-classpath',
+          `-Dmdep.outputFile=${classpathFile}`, '-Dmdep.includeScope=test'],
+        {cwd: projectDir, encoding: 'utf8', stdio: 'pipe'})
+        const classpath = [path.join(projectDir, 'target', 'test-classes'),
+          fs.readFileSync(classpathFile, 'utf-8').trim()].join(path.delimiter)
+        const output = execFileSync(java,
+          ['-cp', classpath, 'com.kobiton.scriptlessautomation.SessionCapabilitiesCheck'],
+          {cwd: projectDir, encoding: 'utf8', stdio: 'pipe'})
+        expect(output).toContain('Validated W3C session capabilities')
+      }
+      catch (err) {
+        throw new Error('Session capabilities check failed:\n' +
           `${(err.stdout || '').trim()}\n${(err.stderr || '').trim()}`)
       }
     }, 600000)

@@ -19,6 +19,7 @@ import io.appium.java_client.remote.MobilePlatform;
 import io.appium.java_client.remote.SupportsContextSwitching;
 import io.appium.java_client.remote.SupportsLocation;
 import io.appium.java_client.remote.SupportsRotation;
+import io.appium.java_client.remote.options.BaseOptions;
 import okhttp3.*;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -80,11 +81,19 @@ public class TestBase {
         AppiumClientConfig clientConfig = AppiumClientConfig.defaultConfig()
             .baseUrl(getAppiumServerUrl())
             .readTimeout(Duration.ofSeconds(ProxyServer.socketTimeoutInSecond));
+        Capabilities sessionCaps = toSessionCapabilities(desiredCaps);
         if (isIos) {
-            driver = new IOSDriver(clientConfig, desiredCaps);
+            driver = new IOSDriver(clientConfig, sessionCaps);
         } else {
-            driver = new AndroidDriver(clientConfig, desiredCaps);
+            driver = new AndroidDriver(clientConfig, sessionCaps);
         }
+    }
+
+    /**
+     * Selenium 4 only sends W3C capabilities; BaseOptions adds the "appium:" prefix to non-standard keys
+     */
+    public static Capabilities toSessionCapabilities(Capabilities capabilities) {
+        return new BaseOptions<>(capabilities);
     }
 
     /**
