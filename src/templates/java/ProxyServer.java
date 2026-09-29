@@ -5,12 +5,10 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import fi.iki.elonen.NanoHTTPD;
 import okhttp3.*;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.utils.URIBuilder;
 import org.openqa.selenium.remote.ErrorCodes;
-import org.springframework.util.SocketUtils;
 
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -20,7 +18,7 @@ public class ProxyServer extends NanoHTTPD {
     public Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 
     private final String authString = Config.getBasicAuthString();
-    private final int socketTimeoutInSecond = 15 * 60;
+    public static final int socketTimeoutInSecond = 15 * 60;
     private boolean forceW3C = false;
 
     private final OkHttpClient httpClient = Config.createHttpClientBuilder()
@@ -30,8 +28,15 @@ public class ProxyServer extends NanoHTTPD {
             .build();
 
     public ProxyServer() throws IOException {
-        super(SocketUtils.findAvailableTcpPort());
+        super(findAvailablePort());
         start(socketTimeoutInSecond * 1000, false);
+    }
+
+    private static int findAvailablePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(true);
+            return socket.getLocalPort();
+        }
     }
 
     @Override
@@ -42,7 +47,7 @@ public class ProxyServer extends NanoHTTPD {
             try (okhttp3.Response response = httpClient.newCall(request).execute()) {
                 int statusCode = response.code();
                 ResponseStatus status = new ResponseStatus(statusCode, response.message());
-                String contentType = response.header(HttpHeaders.CONTENT_TYPE, "application/json");
+                String contentType = response.header("Content-Type", "application/json");
                 String bodyString = response.body().string();
 
                 try {
@@ -103,7 +108,7 @@ public class ProxyServer extends NanoHTTPD {
 
         RequestBody requestBody = null;
         if (requestBodyString != null) {
-            requestBody = RequestBody.create(MediaType.parse("application/json"), requestBodyString);
+            requestBody = RequestBody.create(requestBodyString, MediaType.get("application/json"));
         }
 
         String uri = session.getUri();
@@ -111,15 +116,15 @@ public class ProxyServer extends NanoHTTPD {
             uri = uri.replace("/wd/hub", "");
         }
 
-        URIBuilder uriBuilder = new URIBuilder(Config.getAppiumServerUrlWithAuth() + uri);
+        HttpUrl.Builder urlBuilder = HttpUrl.get(Config.getAppiumServerUrlWithAuth() + uri).newBuilder();
         if (Config.DEVICE_SOURCE == Config.DEVICE_SOURCE_ENUMS.KOBITON && currentCommandId > 0) {
-            uriBuilder.addParameter("baseCommandId", String.valueOf(currentCommandId));
+            urlBuilder.addQueryParameter("baseCommandId", String.valueOf(currentCommandId));
         }
 
         Request.Builder requestBuilder = new Request.Builder()
-                .header(HttpHeaders.AUTHORIZATION, authString)
+                .header("Authorization", authString)
                 .method(method.toString(), requestBody)
-                .url(uriBuilder.build().toURL());
+                .url(urlBuilder.build());
 
         return requestBuilder.build();
     }

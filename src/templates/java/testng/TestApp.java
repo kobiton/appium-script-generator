@@ -1,15 +1,14 @@
 package com.kobiton.scriptlessautomation;
 
-import io.appium.java_client.MobileBy;
-import io.appium.java_client.MobileElement;
-import io.appium.java_client.remote.MobileCapabilityType;
+import io.appium.java_client.AppiumBy;
+import io.appium.java_client.Location;
 import org.testng.Reporter;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Point;
 import org.openqa.selenium.Rectangle;
 import org.openqa.selenium.ScreenOrientation;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.DesiredCapabilities;
-import org.openqa.selenium.html5.Location;
 
 public class TestApp extends TestBase {
     public void runTest() throws Exception {

@@ -1,7 +1,6 @@
 package com.kobiton.scriptlessautomation;
 
 import okhttp3.OkHttpClient;
-import org.apache.commons.codec.binary.Base64;
 import org.openqa.selenium.remote.DesiredCapabilities;
 
 import javax.net.ssl.SSLContext;
@@ -11,7 +10,9 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 
 public class Config {
     enum DEVICE_SOURCE_ENUMS {KOBITON, OTHER}
@@ -40,9 +41,7 @@ public class Config {
 
     public static String getBasicAuthString() {
         String authString = API_USERNAME + ":" + API_KEY;
-        byte[] authEncBytes = Base64.encodeBase64(authString.getBytes());
-        String authEncString = new String(authEncBytes);
-        return "Basic " + authEncString;
+        return "Basic " + Base64.getEncoder().encodeToString(authString.getBytes(StandardCharsets.UTF_8));
     }
 
     // Returns an OkHttpClient builder that trusts any TLS certificate when
